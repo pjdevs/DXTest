@@ -14,5 +14,8 @@ public:
 
 	ID3D11Device* getDevice() const;
 	ID3D11DeviceContext* getDeviceContext() const;
+
+	ID3D11Buffer* createVertexBuffer(void* vertices, size_t sizeInBytes) const;
+	ID3D11Buffer* createConstantBuffer(void* data, size_t sizeInBytes) const;
 };
 

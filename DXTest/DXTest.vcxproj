@@ -135,6 +135,7 @@
   <ItemGroup>
     <ClCompile Include="GraphicsDevice.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="Mesh.cpp" />
     <ClCompile Include="RenderWindow.cpp" />
     <ClCompile Include="Shader.cpp" />
   </ItemGroup>
@@ -148,6 +149,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="GraphicsDevice.hpp" />
+    <ClInclude Include="Mesh.hpp" />
     <ClInclude Include="RenderWindow.hpp" />
     <ClInclude Include="Shader.hpp" />
   </ItemGroup>

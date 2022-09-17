@@ -7,6 +7,7 @@
 #include "GraphicsDevice.hpp"
 #include "RenderWindow.hpp"
 #include "Shader.hpp"
+#include "Mesh.hpp"
 
 using namespace DirectX;
 
@@ -31,10 +32,7 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 	GraphicsDevice device;
 	RenderWindow window(device, 800, 600);
 	Shader shader(device, L"Phong.hlsl");
-	HRESULT hr;
 	
-	#pragma region DX
-	// Create a vertex buffer
 	Vertex vertices[] =
 	{
 		// Triangle 1
@@ -46,22 +44,7 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 		XMFLOAT3( 5.0f, 0.0f, -5.0f), XMFLOAT3(0.0f, 1.0f, 0.0f),
 		XMFLOAT3( 5.0f, 0.0f,  5.0f), XMFLOAT3(0.0f, 1.0f, 0.0f)
 	};
-	ID3D11Buffer* vertexBuffer = nullptr;
-	D3D11_BUFFER_DESC vbDesc = CD3D11_BUFFER_DESC(6 * sizeof(Vertex), D3D11_BIND_VERTEX_BUFFER);
-	D3D11_SUBRESOURCE_DATA vbData = { 0 };
-	vbData.pSysMem = vertices;
-
-	hr = device.getDevice()->CreateBuffer(&vbDesc, &vbData, &vertexBuffer);
-
-	// Check for error
-	if (FAILED(hr)) throw new std::exception("Error while creating vertex buffer");
-
-	ID3D11Buffer* vertexBuffers[] = { vertexBuffer, vertexBuffer };
-	UINT strides[] = { sizeof(Vertex), sizeof(Vertex) };
-	UINT offsets[] = { 0, sizeof(XMFLOAT3) };
-
-	// Create constant buffer
-	ID3D11Buffer* vsCb = nullptr;
+	Mesh mesh(device, vertices, sizeof(Vertex), 6, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 	VSConstantBuffer cb {};
 	const XMFLOAT3 viewPos(3.0f, 3.0f, 3.0f);
@@ -70,26 +53,7 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 	XMStoreFloat4x4(&cb.projection, XMMatrixTranspose(XMMatrixPerspectiveFovRH(0.7f, 800.f / 600.f, 0.1f, 100.f)));
 	cb.viewPos = viewPos;
 
-	D3D11_BUFFER_DESC cbDesc = { 0 };
-	cbDesc.ByteWidth = sizeof(VSConstantBuffer);
-	cbDesc.Usage = D3D11_USAGE_DYNAMIC;
-	cbDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-	cbDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-	cbDesc.MiscFlags = 0;
-	cbDesc.StructureByteStride = 0;
-
-	// Fill in the subresource data.
-	D3D11_SUBRESOURCE_DATA cbData = { 0 };
-	cbData.pSysMem = &cb;
-	cbData.SysMemPitch = 0;
-	cbData.SysMemSlicePitch = 0;
-
-	// Create the buffer.
-	hr = device.getDevice()->CreateBuffer(&cbDesc, &cbData, &vsCb);
-
-	// Check for error
-	if (FAILED(hr)) throw new std::exception("Error while creating constant buffer");
-	#pragma endregion
+	ID3D11Buffer* vsCb = device.createConstantBuffer(&cb, sizeof(VSConstantBuffer));
 
 	char buf[100] = "Hello";
 	float blue[] = { 0.2f, 0.4f, 0.9f, 1.0f };
@@ -108,6 +72,8 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 		}
 
 		// Update
+		int* a[3];
+		int** b = a;
 
 		// Render scene
 		viewport = CD3D11_VIEWPORT(0.f, 0.f, window.getWidth(), window.getHeight());
@@ -118,9 +84,9 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 		device.getDeviceContext()->ClearRenderTargetView(window.getBackBufferRT(), blue);
 		device.getDeviceContext()->ClearDepthStencilView(window.getBackBufferDS(), D3D11_CLEAR_DEPTH, 1.0f, 0);
 
-		device.getDeviceContext()->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		device.getDeviceContext()->IASetPrimitiveTopology(mesh.getTopology());
 		device.getDeviceContext()->IASetInputLayout(shader.getInputLayout());
-		device.getDeviceContext()->IASetVertexBuffers(0, 2, vertexBuffers, strides, offsets);
+		device.getDeviceContext()->IASetVertexBuffers(0, 2, mesh.getVertexBuffers(), mesh.getVertexStrides(), mesh.getVertexOffsets());
 
 		device.getDeviceContext()->VSSetShader(shader.getVertexShader(), nullptr, 0);
 		device.getDeviceContext()->PSSetShader(shader.getPixelShader(), nullptr, 0);
