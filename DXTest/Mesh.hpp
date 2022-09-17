@@ -5,12 +5,14 @@
 #include <DirectXMath.h>
 #include "GraphicsDevice.hpp"
 
+constexpr auto MESH_ATTRIBUTES = 3;
+
 class Mesh
 {
 private:
-	ID3D11Buffer* _vertexBuffers[2];
-	UINT _offsets[2];
-	UINT _strides[2];
+	ID3D11Buffer* _vertexBuffers[MESH_ATTRIBUTES];
+	UINT _offsets[MESH_ATTRIBUTES];
+	UINT _strides[MESH_ATTRIBUTES];
 	D3D11_PRIMITIVE_TOPOLOGY _topology;
 	size_t _vertexCount;
 
@@ -21,5 +23,6 @@ public:
 	ID3D11Buffer** getVertexBuffers();
 	UINT* getVertexStrides();
 	UINT* getVertexOffsets();
-	D3D11_PRIMITIVE_TOPOLOGY getTopology();
+	D3D11_PRIMITIVE_TOPOLOGY getTopology() const;
+	UINT getNumBuffers() const;
 };
