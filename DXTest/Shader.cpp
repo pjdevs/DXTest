@@ -1,21 +1,32 @@
 #include "Shader.hpp"
 
-Shader::Shader(const GraphicsDevice& device, const std::wstring& shaderPath)
+Shader::Shader(ID3D11Device* device, const std::wstring& shaderPath)
+	: _path(shaderPath)
+{
+	loadShader(device);
+}
+
+Shader::~Shader()
+{
+	unloadShader();
+}
+
+void Shader::loadShader(ID3D11Device* device)
 {
 	// Creating shaders
 	HRESULT hr;
 	ID3DBlob* vsBlob = nullptr;
 	ID3DBlob* psBlob = nullptr;
 
-	hr = compileShader(shaderPath.c_str(), "VSMain", "vs_5_0", &vsBlob);
+	hr = compileShader(_path.c_str(), "VSMain", "vs_5_0", &vsBlob);
 	if (FAILED(hr))
 		throw new std::exception("Error while compiling vertex shader");
 
-	hr = compileShader(shaderPath.c_str(), "PSMain", "ps_5_0", &psBlob);
+	hr = compileShader(_path.c_str(), "PSMain", "ps_5_0", &psBlob);
 	if (FAILED(hr))
 		throw new std::exception("Error while compiling pixel shader");
 
-	hr = device.getDevice()->CreateVertexShader(
+	hr = device->CreateVertexShader(
 		vsBlob->GetBufferPointer(),
 		vsBlob->GetBufferSize(),
 		nullptr,
@@ -24,7 +35,7 @@ Shader::Shader(const GraphicsDevice& device, const std::wstring& shaderPath)
 	if (FAILED(hr))
 		throw new std::exception("Error while creating vertex shader");
 
-	hr = device.getDevice()->CreatePixelShader(
+	hr = device->CreatePixelShader(
 		psBlob->GetBufferPointer(),
 		psBlob->GetBufferSize(),
 		nullptr,
@@ -39,7 +50,7 @@ Shader::Shader(const GraphicsDevice& device, const std::wstring& shaderPath)
 	  { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 1, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 	  { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 2, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 }
 	};
-	hr = device.getDevice()->CreateInputLayout(
+	hr = device->CreateInputLayout(
 		inputElementDesc,
 		3,
 		vsBlob->GetBufferPointer(),
@@ -55,11 +66,17 @@ Shader::Shader(const GraphicsDevice& device, const std::wstring& shaderPath)
 	psBlob->Release();
 }
 
-Shader::~Shader()
+void Shader::unloadShader()
 {
 	_inputLayout->Release();
 	_pixelShader->Release();
 	_vertexShader->Release();
+}
+
+void Shader::reload(ID3D11Device* device)
+{
+	unloadShader();
+	loadShader(device);
 }
 
 ID3D11VertexShader* Shader::getVertexShader() const

@@ -137,8 +137,10 @@
     <ClCompile Include="GraphicsDevice.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Mesh.cpp" />
+    <ClCompile Include="MeshBuilder.cpp" />
     <ClCompile Include="RenderWindow.cpp" />
     <ClCompile Include="Shader.cpp" />
+    <ClCompile Include="Texture.cpp" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Phong.hlsl">
@@ -152,9 +154,11 @@
     <ClInclude Include="Camera.hpp" />
     <ClInclude Include="GraphicsDevice.hpp" />
     <ClInclude Include="Mesh.hpp" />
+    <ClInclude Include="MeshBuilder.hpp" />
     <ClInclude Include="RenderWindow.hpp" />
     <ClInclude Include="Shader.hpp" />
     <ClInclude Include="stb_image.h" />
+    <ClInclude Include="Texture.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\park_parking_4k.hdr" />

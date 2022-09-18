@@ -23,7 +23,7 @@ void SphericalCamera::computeMatrices()
 		XMMatrixTranspose(XMMatrixLookAtRH(XMVectorSet(_position.x, _position.y, _position.z, 1.0f), XMVectorSet(_target.x, _target.y, _target.z, 1.0f), XMVectorSet(0.0f, 1.0f, 0.0f, 1.0f))));
 	XMStoreFloat4x4(
 		&_projection,
-		XMMatrixTranspose(XMMatrixPerspectiveFovRH(XMConvertToRadians(80.f), _width / _height, 0.1f, 100.f))
+		XMMatrixTranspose(XMMatrixPerspectiveFovRH(XMConvertToRadians(80.f), _width / _height, 0.1f, 1000.f))
 	);
 	
 }

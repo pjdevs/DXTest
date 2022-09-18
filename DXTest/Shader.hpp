@@ -8,19 +8,26 @@
 class Shader
 {
 private:
+	std::wstring _path;
+
 	ID3D11VertexShader* _vertexShader;
 	ID3D11PixelShader* _pixelShader;
 	ID3D11InputLayout* _inputLayout;
 
 private:
+	void loadShader(ID3D11Device* device);
+	void unloadShader();
+
 	static HRESULT compileShader(_In_ LPCWSTR srcFile, _In_ LPCSTR entryPoint, _In_ LPCSTR profile, _Outptr_ ID3DBlob** blob);
 
 public:
-	Shader(const GraphicsDevice& device, const std::wstring& shaderPath);
+	Shader(ID3D11Device* device, const std::wstring& shaderPath);
 	~Shader();
 
 	ID3D11VertexShader* getVertexShader() const;
 	ID3D11PixelShader* getPixelShader() const;
 	ID3D11InputLayout* getInputLayout() const;
+
+	void reload(ID3D11Device* device);
 };
 

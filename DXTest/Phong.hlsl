@@ -1,5 +1,5 @@
-Texture2D tex;
-SamplerState textureSampler;
+Texture2D tex : register(t0);
+SamplerState textureSampler : register(s0);
 
 cbuffer VSConstantBuffer : register(b0)
 {

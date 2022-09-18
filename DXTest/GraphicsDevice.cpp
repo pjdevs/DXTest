@@ -20,7 +20,7 @@ GraphicsDevice::GraphicsDevice()
 	);
 
 	if (level != D3D_FEATURE_LEVEL_11_1 || FAILED(hr))
-		throw new std::exception("Direct3D 11.1 must be supported");
+		throw std::exception("Direct3D 11.1 must be supported");
 }
 
 ID3D11Device* GraphicsDevice::getDevice() const
@@ -33,28 +33,13 @@ ID3D11DeviceContext* GraphicsDevice::getDeviceContext() const
 	return _deviceContext;
 }
 
-ID3D11Buffer* GraphicsDevice::createVertexBuffer(void* vertices, size_t sizeInBytes) const
-{
-	ID3D11Buffer* vertexBuffer = nullptr;
-	D3D11_BUFFER_DESC vbDesc = CD3D11_BUFFER_DESC(sizeInBytes, D3D11_BIND_VERTEX_BUFFER);
-	D3D11_SUBRESOURCE_DATA vbData = { 0 };
-	vbData.pSysMem = vertices;
-
-	HRESULT hr = _device->CreateBuffer(&vbDesc, &vbData, &vertexBuffer);
-
-	if (FAILED(hr))
-		throw new std::exception("Error while creating vertex buffer");
-
-	return vertexBuffer;
-}
-
-ID3D11Buffer* GraphicsDevice::createConstantBuffer(void* data, size_t sizeInBytes) const
+ID3D11Buffer* GraphicsDevice::createBuffer(void* data, size_t sizeInBytes, D3D11_USAGE usage, D3D11_BIND_FLAG bindFlags, D3D11_CPU_ACCESS_FLAG cpuAccessFlags) const
 {
 	D3D11_BUFFER_DESC cbDesc = { 0 };
 	cbDesc.ByteWidth = sizeInBytes;
-	cbDesc.Usage = D3D11_USAGE_DYNAMIC;
-	cbDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-	cbDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+	cbDesc.Usage = usage;
+	cbDesc.BindFlags = bindFlags;
+	cbDesc.CPUAccessFlags = cpuAccessFlags;
 	cbDesc.MiscFlags = 0;
 	cbDesc.StructureByteStride = 0;
 
@@ -64,11 +49,11 @@ ID3D11Buffer* GraphicsDevice::createConstantBuffer(void* data, size_t sizeInByte
 	cbData.SysMemSlicePitch = 0;
 
 	// Create the buffer.
-	ID3D11Buffer* constantBuffer = nullptr;
-	HRESULT hr = _device->CreateBuffer(&cbDesc, &cbData, &constantBuffer);
+	ID3D11Buffer* buffer = nullptr;
+	HRESULT hr = _device->CreateBuffer(&cbDesc, &cbData, &buffer);
 
 	if (FAILED(hr))
-		throw new std::exception("Error while creating constant buffer");
+		throw std::exception("Error while creating buffer");
 
-	return constantBuffer;
+	return buffer;
 }

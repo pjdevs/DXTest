@@ -1,9 +1,10 @@
 #include "Mesh.hpp"
 
-Mesh::Mesh(const GraphicsDevice& device, void* vertices, UINT vertexSize, UINT vertexCount, D3D11_PRIMITIVE_TOPOLOGY topology)
-	: _topology(topology), _vertexCount(vertexCount)
+Mesh::Mesh(const GraphicsDevice& device, void* vertices, UINT vertexSize, UINT vertexCount, UINT* indices, UINT indexCount)
+	: _vertexCount(vertexCount), _numBuffers(3), _indexBuffer(nullptr), _indexCount(indexCount)
 {
-	ID3D11Buffer* vertexBuffer = device.createVertexBuffer(vertices, vertexSize * vertexCount);
+	ID3D11Buffer* vertexBuffer = device.createBuffer(vertices, vertexSize * vertexCount, D3D11_USAGE_DEFAULT, D3D11_BIND_VERTEX_BUFFER, (D3D11_CPU_ACCESS_FLAG)0);
+	_indexBuffer = device.createBuffer(indices, sizeof(UINT) * indexCount, D3D11_USAGE_DEFAULT, D3D11_BIND_INDEX_BUFFER, (D3D11_CPU_ACCESS_FLAG)0);
 
 	_vertexBuffers[0] = vertexBuffer;
 	_vertexBuffers[1] = vertexBuffer;
@@ -25,6 +26,11 @@ ID3D11Buffer** Mesh::getVertexBuffers()
 	return _vertexBuffers;
 }
 
+ID3D11Buffer* Mesh::getIndexBuffer()
+{
+	return _indexBuffer;
+}
+
 UINT* Mesh::getVertexStrides()
 {
 	return _strides;
@@ -37,10 +43,10 @@ UINT* Mesh::getVertexOffsets()
 
 UINT Mesh::getNumBuffers() const
 {
-	return 3;
+	return _numBuffers;
 }
 
-D3D11_PRIMITIVE_TOPOLOGY Mesh::getTopology() const
+UINT Mesh::getIndexCount() const
 {
-	return _topology;
+	return _indexCount;
 }
