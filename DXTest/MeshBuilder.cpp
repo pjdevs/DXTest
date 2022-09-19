@@ -14,18 +14,19 @@ float* MeshData::flattenVertices() const
 	for (int vertexIndex = 0; vertexIndex < vertexCount; ++vertexIndex)
 	{
 		int firstFloatIndex = 3 * vertexIndex;
+		int firstFloatIndexTex = 2 * vertexIndex;
 		int flatFirstFloatIndex = 8 * vertexIndex;
 
-		vertices[flatFirstFloatIndex] = positions[vertexIndex];
-		vertices[flatFirstFloatIndex + 1] = positions[vertexIndex + 1];
-		vertices[flatFirstFloatIndex + 2] = positions[vertexIndex + 2];
+		vertices[flatFirstFloatIndex] = positions[firstFloatIndex];
+		vertices[flatFirstFloatIndex + 1] = positions[firstFloatIndex + 1];
+		vertices[flatFirstFloatIndex + 2] = positions[firstFloatIndex + 2];
 
-		vertices[flatFirstFloatIndex + 3] = texCoords[vertexIndex];
-		vertices[flatFirstFloatIndex + 4] = texCoords[vertexIndex + 1];
+		vertices[flatFirstFloatIndex + 3] = texCoords[firstFloatIndexTex];
+		vertices[flatFirstFloatIndex + 4] = texCoords[firstFloatIndexTex + 1];
 
-		vertices[flatFirstFloatIndex + 5] = normals[vertexIndex];
-		vertices[flatFirstFloatIndex + 6] = normals[vertexIndex + 1];
-		vertices[flatFirstFloatIndex + 7] = normals[vertexIndex + 2];
+		vertices[flatFirstFloatIndex + 5] = normals[firstFloatIndex];
+		vertices[flatFirstFloatIndex + 6] = normals[firstFloatIndex + 1];
+		vertices[flatFirstFloatIndex + 7] = normals[firstFloatIndex + 2];
 	}
 
 	return vertices;
@@ -257,7 +258,9 @@ MeshData* MeshData::fromFile(const std::string& path)
 		aiProcess_JoinIdenticalVertices |
 		aiProcess_SortByPType |
 		aiProcess_OptimizeGraph |
-		aiProcess_OptimizeMeshes);
+		aiProcess_OptimizeMeshes |
+		aiProcess_FlipWindingOrder |
+		aiProcess_GlobalScale);
 
 	if (scene == nullptr)
 		throw std::exception(importer->GetErrorString());

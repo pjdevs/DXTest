@@ -56,6 +56,12 @@ void SphericalCamera::update(float mouseDx, float mouseDy, float mouseScrollY, b
 	if (mouseRight)
 	{
 		_phi += mouseDx * dt;
-		_theta += mouseDy * dt;
+		_theta -= mouseDy * dt;
 	}
+
+	if (_theta <= 0.01f)
+		_theta = 0.01f;
+
+	if (_theta >= M_PI - 0.001f)
+		_theta = M_PI - 0.001f;
 }
