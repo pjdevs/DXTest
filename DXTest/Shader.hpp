@@ -13,6 +13,7 @@ private:
 	ID3D11VertexShader* _vertexShader;
 	ID3D11PixelShader* _pixelShader;
 	ID3D11InputLayout* _inputLayout;
+	int _attributes;
 
 private:
 	void loadShader(ID3D11Device* device);
@@ -21,7 +22,7 @@ private:
 	static HRESULT compileShader(_In_ LPCWSTR srcFile, _In_ LPCSTR entryPoint, _In_ LPCSTR profile, _Outptr_ ID3DBlob** blob);
 
 public:
-	Shader(ID3D11Device* device, const std::wstring& shaderPath);
+	Shader(ID3D11Device* device, const std::wstring& shaderPath, int attributes = 3);
 	~Shader();
 
 	ID3D11VertexShader* getVertexShader() const;

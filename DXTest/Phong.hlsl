@@ -12,15 +12,15 @@ cbuffer VSConstantBuffer : register(b0)
 struct VS_IN
 {
     float3 position : POSITION;
-    float2 uv : TEXCOORD0;
+    float2 uv : TEXCOORD;
     float3 normal : NORMAL;
 };
 
 struct VS_OUT
 {
-    float3 worldPos : POSITION;
-    float2 uv : TEXCOORD0;
-     float3 normal : NORMAL;
+    float3 worldPos : POSITIONT;
+    float2 uv : TEXCOORD;
+    float3 normal : POSITION;
     float4 position : SV_POSITION;
 };
 
@@ -30,7 +30,7 @@ VS_OUT VSMain(VS_IN input)
 
     float4 worldPos = mul(float4(input.position, 1.0), model);
     
-    output.worldPos = worldPos;
+    output.worldPos = worldPos.xyz;
     output.uv = input.uv;
     output.normal = input.normal;
     output.position = mul(mul(worldPos, view), projection);
@@ -38,10 +38,10 @@ VS_OUT VSMain(VS_IN input)
     return output;
 }
 
-float4 PSMain(linear VS_OUT input) : SV_TARGET
+float4 PSMain(VS_OUT input) : SV_TARGET
 {
-    const float3 lightDir = float3(-1.0, -0.5, -1.0);
-    const float3 color = tex.Sample(textureSampler, input.uv);
+    const float3 lightDir = float3(-1.0, -1.5, -1.0);
+    float3 color = float3(1.0, 0.0, 0.0); //tex.Sample(textureSampler, input.uv);
     float3 normal = normalize(input.normal);
     float3 viewDir = normalize(viewPos - input.worldPos);
     float3 reflectedLightDir = reflect(lightDir, normal);

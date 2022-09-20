@@ -1,7 +1,7 @@
 #include "Shader.hpp"
 
-Shader::Shader(ID3D11Device* device, const std::wstring& shaderPath)
-	: _path(shaderPath)
+Shader::Shader(ID3D11Device* device, const std::wstring& shaderPath, int attributes)
+	: _path(shaderPath), _attributes(attributes)
 {
 	loadShader(device);
 }
@@ -52,7 +52,7 @@ void Shader::loadShader(ID3D11Device* device)
 	};
 	hr = device->CreateInputLayout(
 		inputElementDesc,
-		3,
+		_attributes,
 		vsBlob->GetBufferPointer(),
 		vsBlob->GetBufferSize(),
 		&_inputLayout
