@@ -40,16 +40,11 @@ VS_OUT VSMain(VS_IN input)
 
 float4 PSMain(VS_OUT input) : SV_TARGET
 {
-    const float3 lightDir = float3(-1.0, -1.5, -1.0);
-    const float3 color = float3(1.0, 0.0, 0.0);
     float3 normal = normalize(input.normal);
     float3 viewDir = normalize(viewPos - input.worldPos);
-    float3 reflectedLightDir = reflect(lightDir, normal);
-
-    float3 ambient = 0.1 * color;
-    float3 diffuse = saturate(dot(normal, -lightDir)) * color;
-    float3 specular = pow(saturate(dot(viewDir, reflectedLightDir)), 32) * color;
-    float3 result = ambient + diffuse + specular;
+    float3 reflectedViewDir = reflect(-viewDir, normal);
+    float3 light = env.Sample(envSampler, reflectedViewDir);
+    float3 result = lerp(float3(0.8, 0.1, 0.1), light, 0.25);
     
     result /= (result + 1.0);
     

@@ -79,7 +79,7 @@
     <None Include="Resources\park_parking_4k.hdr" />
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="Phong.hlsl">
+    <FxCompile Include="phong.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
     <FxCompile Include="cubemap.hlsl">
@@ -89,6 +89,9 @@
       <Filter>Shaders</Filter>
     </FxCompile>
     <FxCompile Include="color.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="IBL.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
   </ItemGroup>

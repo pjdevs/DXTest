@@ -13,15 +13,6 @@
 
 using namespace DirectX;
 
-static const XMMATRIX rotations[6] = {
-	XMMatrixRotationY(-XM_PIDIV2), // Look: +x Index: 0
-	XMMatrixRotationY(XM_PIDIV2), // Look: -x Index: 1
-	XMMatrixRotationX(XM_PIDIV2), // Look: +y Index: 2
-	XMMatrixRotationX(-XM_PIDIV2), // Look: -y Index: 3
-	XMMatrixIdentity(),            // Look: +z Index: 4
-	XMMatrixRotationY(XM_PI),      // Look: -z Index: 5
-};
-
 struct Vertex
 {
 	XMFLOAT3 position;
@@ -77,7 +68,7 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 	// Init device, window, swapchain
 	GraphicsDevice device;
 	RenderWindow window(device, 800, 600);
-	Shader shader(device, L"Phong.hlsl", normalDesc, ARRAYSIZE(normalDesc));
+	Shader shader(device, L"IBL.hlsl", normalDesc, ARRAYSIZE(normalDesc));
 	Shader cubemapShader(device, L"cubemap.hlsl", positionDesc, ARRAYSIZE(positionDesc));
 	SphericalCamera camera(0.f, 0.f, 0.f);
 
@@ -129,35 +120,8 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 
 	Mesh* cubeMesh = loadMesh(device, "Resources/cube.obj", true);
 	Texture* texture = loadTextureHDR(device, "Resources/park_parking_4k.hdr");
-	TextureCube tc(device, 1024, 1024, 1);
+	TextureCube tc(device, 2048, 2048, 1);
 	Shader projectShader(device, L"project.hlsl", positionDesc, ARRAYSIZE(positionDesc));
-
-	ID3D11DepthStencilView* dsView = nullptr;
-	ID3D11Texture2D* depthStencilTexture = nullptr;
-	D3D11_TEXTURE2D_DESC depthStencilDesc = { 0 };
-	depthStencilDesc.Width = 1024;
-	depthStencilDesc.Height = 1024;
-	depthStencilDesc.MipLevels = 1;
-	depthStencilDesc.ArraySize = 1;
-	depthStencilDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-	depthStencilDesc.SampleDesc.Count = 1;
-	depthStencilDesc.SampleDesc.Quality = 0;
-	depthStencilDesc.Usage = D3D11_USAGE_DEFAULT;
-	depthStencilDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
-	depthStencilDesc.CPUAccessFlags = 0;
-	depthStencilDesc.MiscFlags = 0;
-
-	hr = device.getDevice()->CreateTexture2D(&depthStencilDesc, nullptr, &depthStencilTexture);
-
-	// Check for error
-	if (FAILED(hr))
-		throw new std::exception("Error while creating depth stencil");
-
-	hr = device.getDevice()->CreateDepthStencilView(depthStencilTexture, nullptr, &dsView);
-
-	// Check for error
-	if (FAILED(hr))
-		throw new std::exception("Error while creating depth stencil view");
 
 	// Fill cubemap
 	XMMATRIX viewMatrices[6] =
@@ -172,12 +136,11 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 
 	for (int i = 0; i < 6; ++i)
 	{
-		viewport = CD3D11_VIEWPORT(0.f, 0.f, 1024.f, 1024.f);
+		viewport = CD3D11_VIEWPORT(0.f, 0.f, 2048.f, 2048.f);
 		ID3D11RenderTargetView* views = tc.getCubeFaceRTView(i);
-		device.getDeviceContext()->OMSetRenderTargets(1, &views, dsView);
+		device.getDeviceContext()->OMSetRenderTargets(1, &views, nullptr);
 		device.getDeviceContext()->RSSetViewports(1, &viewport);
 		device.getDeviceContext()->ClearRenderTargetView(views, clearColor);
-		device.getDeviceContext()->ClearDepthStencilView(dsView, D3D11_CLEAR_DEPTH, 1.0f, 0);
 		device.getDeviceContext()->OMSetDepthStencilState(defaultDs, 0);
 
 		XMStoreFloat4x4(&cb.model, XMMatrixIdentity());
@@ -235,7 +198,7 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 		XMStoreFloat4x4(&cb.model, XMMatrixTranspose(XMMatrixAffineTransformation(
 			XMLoadFloat3(&scale),
 			XMLoadFloat3(&position),
-			XMQuaternionIdentity(),
+			XMQuaternionRotationRollPitchYawFromVector(XMLoadFloat3(&rotation)),
 			XMLoadFloat3(&position)
 		)));
 		cb.view = camera.getView();
@@ -263,7 +226,7 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 		shader.bind(device);
 		device.getDeviceContext()->VSSetConstantBuffers(0, 1, &vsCb);
 		device.getDeviceContext()->PSSetConstantBuffers(0, 1, &vsCb);
-		texture->bind(device, 0);
+		tc.bind(device, 0);
 		mesh->bind(device);
 		mesh->draw(device);
 
@@ -345,9 +308,9 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 			ImGui::EndListBox();
 		}
 
-		ImGui::DragFloat3("Position", (float*)(&position));
-		ImGui::DragFloat3("Rotation", (float*)(&rotation));
-		ImGui::DragFloat3("Scale", (float*)(&scale));
+		ImGui::DragFloat3("Position", (float*)(&position), 0.1f);
+		ImGui::DragFloat3("Rotation", (float*)(&rotation), 0.1f);
+		ImGui::DragFloat3("Scale", (float*)(&scale), 0.1f);
 		ImGui::End();
 		
 		mouseScrollY = io.MouseWheel;
