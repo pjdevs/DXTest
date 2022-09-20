@@ -26,9 +26,10 @@ private:
 	UINT _vertexCount;
 	UINT _indexCount;
 	UINT _numBuffers;
+	D3D11_PRIMITIVE_TOPOLOGY _topology;
 
 public:
-	Mesh(const GraphicsDevice& device, void* vertices, UINT vertexSize, UINT vertexCount, UINT* indices, UINT indexCount);
+	Mesh(const GraphicsDevice& device, void* vertices, UINT vertexSize, UINT vertexCount, UINT* indices, UINT indexCount, D3D11_PRIMITIVE_TOPOLOGY topology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	~Mesh();
 
 	ID3D11Buffer** getVertexBuffers();
@@ -37,4 +38,7 @@ public:
 	UINT* getVertexOffsets();
 	UINT getNumBuffers() const;
 	UINT getIndexCount() const;
+
+	void bind(const GraphicsDevice& device);
+	void draw(const GraphicsDevice& device);
 };

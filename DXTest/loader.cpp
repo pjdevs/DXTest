@@ -1,6 +1,6 @@
 #include "loader.hpp"
 
-MeshData* loadMeshData(const std::string& path)
+MeshData* loadMeshData(const std::string& path, bool flip)
 {
 	Assimp::Importer* importer = new Assimp::Importer();
 
@@ -10,12 +10,16 @@ MeshData* loadMeshData(const std::string& path)
 		aiProcess_JoinIdenticalVertices |
 		aiProcess_SortByPType |
 		aiProcess_OptimizeGraph |
+		(flip ? aiProcess_FlipWindingOrder : 0) |
 		aiProcess_OptimizeMeshes |
 		aiProcess_GlobalScale |
 		aiProcess_MakeLeftHanded);
 
 	if (scene == nullptr)
+	{
+		OutputDebugStringA(importer->GetErrorString());
 		throw std::exception(importer->GetErrorString());
+	}
 
 	if (!scene->HasMeshes())
 		throw std::exception("File has no meshes");
@@ -54,7 +58,7 @@ Texture* loadTexture(const GraphicsDevice& device, const std::string& path)
 	if (imData == nullptr)
 		throw std::exception("Cannot load texture file");
 
-	Texture* texture = new Texture(device.getDevice(), imWidth, imHeight, imData, 4 * sizeof(float), DXGI_FORMAT_R8G8B8A8_UINT);
+	Texture* texture = new Texture(device, imWidth, imHeight, imData, 4 * sizeof(float), DXGI_FORMAT_R8G8B8A8_UINT);
 
 	stbi_image_free(imData);
 
@@ -70,7 +74,7 @@ Texture* loadTextureHDR(const GraphicsDevice& device, const std::string& path)
 	if (imData == nullptr)
 		throw std::exception("Cannot load texture file");
 
-	Texture* texture = new Texture(device.getDevice(), imWidth, imHeight, imData, 3 * sizeof(float), DXGI_FORMAT_R32G32B32_FLOAT);
+	Texture* texture = new Texture(device, imWidth, imHeight, imData, 3 * sizeof(float), DXGI_FORMAT_R32G32B32_FLOAT);
 
 	stbi_image_free(imData);
 

@@ -1,7 +1,7 @@
 #include "Mesh.hpp"
 
-Mesh::Mesh(const GraphicsDevice& device, void* vertices, UINT vertexSize, UINT vertexCount, UINT* indices, UINT indexCount)
-	: _vertexCount(vertexCount), _numBuffers(3), _indexBuffer(nullptr), _indexCount(indexCount)
+Mesh::Mesh(const GraphicsDevice& device, void* vertices, UINT vertexSize, UINT vertexCount, UINT* indices, UINT indexCount, D3D11_PRIMITIVE_TOPOLOGY topology)
+	: _vertexCount(vertexCount), _numBuffers(3), _indexBuffer(nullptr), _indexCount(indexCount), _topology(topology)
 {
 	ID3D11Buffer* vertexBuffer = device.createBuffer(vertices, vertexSize * vertexCount, D3D11_USAGE_DEFAULT, D3D11_BIND_VERTEX_BUFFER, (D3D11_CPU_ACCESS_FLAG)0);
 	_indexBuffer = device.createBuffer(indices, sizeof(UINT) * indexCount, D3D11_USAGE_DEFAULT, D3D11_BIND_INDEX_BUFFER, (D3D11_CPU_ACCESS_FLAG)0);
@@ -49,4 +49,16 @@ UINT Mesh::getNumBuffers() const
 UINT Mesh::getIndexCount() const
 {
 	return _indexCount;
+}
+
+void Mesh::bind(const GraphicsDevice& device)
+{
+	device.getDeviceContext()->IASetPrimitiveTopology(_topology);
+	device.getDeviceContext()->IASetVertexBuffers(0, getNumBuffers(), getVertexBuffers(), getVertexStrides(), getVertexOffsets());
+	device.getDeviceContext()->IASetIndexBuffer(getIndexBuffer(), DXGI_FORMAT_R32_UINT, 0);
+}
+
+void Mesh::draw(const GraphicsDevice& device)
+{
+	device.getDeviceContext()->DrawIndexed(getIndexCount(), 0, 0);
 }

@@ -23,7 +23,7 @@ VS_OUT VSMain(VS_IN input)
 {
     VS_OUT output;
     
-    output.direction = input.position.xyz;
+    output.direction = input.position;
     output.position = mul(mul(float4(input.position, 1.0), view), projection);
 
     return output;
@@ -32,7 +32,7 @@ VS_OUT VSMain(VS_IN input)
 float2 SampleSphericalMap(float3 v)
 {
     const float2 invAtan = float2(0.1591, 0.3183);
-    float2 uv = float2(atan(v.z / v.x), asin(v.y));
+    float2 uv = float2(atan2(v.z, v.x), asin(v.y));
     uv *= invAtan;
     uv += 0.5;
 

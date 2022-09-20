@@ -1,7 +1,7 @@
 #include "Shader.hpp"
 
-Shader::Shader(ID3D11Device* device, const std::wstring& shaderPath, int attributes)
-	: _path(shaderPath), _attributes(attributes)
+Shader::Shader(const GraphicsDevice& device, const std::wstring& shaderPath, D3D11_INPUT_ELEMENT_DESC* layoutDesc, int layoutSize)
+	: _path(shaderPath), _layoutDesc(layoutDesc), _layoutSize(layoutSize)
 {
 	loadShader(device);
 }
@@ -11,7 +11,7 @@ Shader::~Shader()
 	unloadShader();
 }
 
-void Shader::loadShader(ID3D11Device* device)
+void Shader::loadShader(const GraphicsDevice& device)
 {
 	// Creating shaders
 	HRESULT hr;
@@ -26,7 +26,7 @@ void Shader::loadShader(ID3D11Device* device)
 	if (FAILED(hr))
 		throw new std::exception("Error while compiling pixel shader");
 
-	hr = device->CreateVertexShader(
+	hr = device.getDevice()->CreateVertexShader(
 		vsBlob->GetBufferPointer(),
 		vsBlob->GetBufferSize(),
 		nullptr,
@@ -35,7 +35,7 @@ void Shader::loadShader(ID3D11Device* device)
 	if (FAILED(hr))
 		throw new std::exception("Error while creating vertex shader");
 
-	hr = device->CreatePixelShader(
+	hr = device.getDevice()->CreatePixelShader(
 		psBlob->GetBufferPointer(),
 		psBlob->GetBufferSize(),
 		nullptr,
@@ -45,14 +45,9 @@ void Shader::loadShader(ID3D11Device* device)
 		throw new std::exception("Error while creating pixel shader");
 
 	// Input layout
-	D3D11_INPUT_ELEMENT_DESC inputElementDesc[] = {
-	  { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-	  { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 1, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-	  { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 2, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 }
-	};
-	hr = device->CreateInputLayout(
-		inputElementDesc,
-		_attributes,
+	hr = device.getDevice()->CreateInputLayout(
+		_layoutDesc,
+		_layoutSize,
 		vsBlob->GetBufferPointer(),
 		vsBlob->GetBufferSize(),
 		&_inputLayout
@@ -73,7 +68,7 @@ void Shader::unloadShader()
 	_vertexShader->Release();
 }
 
-void Shader::reload(ID3D11Device* device)
+void Shader::reload(const GraphicsDevice& device)
 {
 	unloadShader();
 	loadShader(device);
@@ -92,6 +87,13 @@ ID3D11PixelShader* Shader::getPixelShader() const
 ID3D11InputLayout* Shader::getInputLayout() const
 {
 	return _inputLayout;
+}
+
+void Shader::bind(const GraphicsDevice& device)
+{
+	device.getDeviceContext()->IASetInputLayout(getInputLayout());
+	device.getDeviceContext()->VSSetShader(getVertexShader(), nullptr, 0);
+	device.getDeviceContext()->PSSetShader(getPixelShader(), nullptr, 0);
 }
 
 HRESULT Shader::compileShader(_In_ LPCWSTR srcFile, _In_ LPCSTR entryPoint, _In_ LPCSTR profile, _Outptr_ ID3DBlob** blob)

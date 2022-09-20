@@ -15,23 +15,6 @@ public:
 	virtual void computeMatrices() = 0;
 };
 
-//class StaticCamera : public Camera
-//{
-//private:
-//	DirectX::XMFLOAT3 _position;
-//	DirectX::XMFLOAT4X4 _view;
-//	DirectX::XMFLOAT4X4 _projection;
-//public:
-//	StaticCamera(const XMFLOAT3& position, const XMFLOAT3& target, const XMFLOAT3& up, float fov, float aspect, float near, float far);
-//
-//	const DirectX::XMFLOAT3& getPosition() const override;
-//	const DirectX::XMFLOAT4X4& getView() const override;
-//	const DirectX::XMFLOAT4X4& getProjection() const override;
-//	void setSize(float width, float height) override;
-//	void update(float mouseDx, float mouseDy, float mouseScrollY, bool mouseRight, float dt) override;
-//	void computeMatrices() override;
-//};
-
 class SphericalCamera : public Camera
 {
 private:
@@ -53,3 +36,20 @@ public:
 	void update(float mouseDx, float mouseDy, float mouseScrollY, bool mouseRight, float dt) override;
 	void computeMatrices() override;
 };
+
+//class StaticCamera : public Camera
+//{
+//private:
+//	DirectX::XMFLOAT3 _position;
+//	DirectX::XMFLOAT4X4 _view;
+//	DirectX::XMFLOAT4X4 _projection;
+//public:
+//	StaticCamera(const XMFLOAT3& position, const XMFLOAT3& target, const XMFLOAT3& up, float fov, float aspect, float nearZ, float farZ);
+//
+//	const DirectX::XMFLOAT3& getPosition() const override;
+//	const DirectX::XMFLOAT4X4& getView() const override;
+//	const DirectX::XMFLOAT4X4& getProjection() const override;
+//	void setSize(float width, float height) override;
+//	void update(float mouseDx, float mouseDy, float mouseScrollY, bool mouseRight, float dt) override;
+//	void computeMatrices() override;
+//};

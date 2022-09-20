@@ -1,13 +1,7 @@
 #define STB_IMAGE_IMPLEMENTATION 
 #define NOMINMAX
 
-#include <Windows.h>
-#include <d3d11.h>
-#include <DirectXMath.h>
-#include <fstream>
-#include <vector>
 #include <imgui.h>
-#include <array>
 #include "GraphicsDevice.hpp"
 #include "RenderWindow.hpp"
 #include "Shader.hpp"
@@ -51,9 +45,9 @@ struct Asset
 	bool isSelected;
 };
 
-Mesh* loadMesh(const GraphicsDevice& device, const std::string& path)
+Mesh* loadMesh(const GraphicsDevice& device, const std::string& path, bool flip = false)
 {
-	MeshData* data = loadMeshData(path);
+	MeshData* data = loadMeshData(path, flip);
 	float* vertices = data->flattenVertices();
 	Mesh* mesh = new Mesh(device, vertices, sizeof(float) * 8, data->positions.size() / 3, data->indices.data(), data->indices.size());
 	delete vertices;
@@ -64,18 +58,31 @@ Mesh* loadMesh(const GraphicsDevice& device, const std::string& path)
 
 int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance, _In_ LPSTR cmdLine, _In_ int cmdCount) {
 
+	// Shader layouts
+	D3D11_INPUT_ELEMENT_DESC normalDesc[] = {
+		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 1, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 2, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 }
+	};
+
+	D3D11_INPUT_ELEMENT_DESC positionDesc[] = {
+		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 }
+	};
+
+	D3D11_INPUT_ELEMENT_DESC colorDesc[] = {
+		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "COLOR", 0, DXGI_FORMAT_R32G32B32_FLOAT, 1, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 }
+	};
+
 	// Init device, window, swapchain
 	GraphicsDevice device;
 	RenderWindow window(device, 800, 600);
-	Shader shader(device.getDevice(), L"Phong.hlsl");
-	Shader cubemapShader(device.getDevice(), L"cubemap.hlsl", 1);
+	Shader shader(device, L"Phong.hlsl", normalDesc, ARRAYSIZE(normalDesc));
+	Shader cubemapShader(device, L"cubemap.hlsl", positionDesc, ARRAYSIZE(positionDesc));
 	SphericalCamera camera(0.f, 0.f, 0.f);
 
 	VSConstantBuffer cb {};
 	ID3D11Buffer* vsCb = device.createBuffer(&cb, sizeof(VSConstantBuffer), D3D11_USAGE_DYNAMIC, D3D11_BIND_CONSTANT_BUFFER, D3D11_CPU_ACCESS_WRITE);
-
-	Texture* texture = loadTextureHDR(device, "Resources/park_parking_4k.hdr");
-	TextureCube tc(device.getDevice(), 1024, 1024, 1);
 
 	Asset assets[] =
 	{
@@ -84,10 +91,10 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 		{ "Sphere", "Resources/sphere.obj", false },
 		{ "Smooth sphere", "Resources/sphere_smooth.obj", false },
 		{ "Characters", "Resources/Characters.fbx", false },
+		{ "Damaged Helmet", "Resources/DamagedHelmet/DamagedHelmet.gltf", false }
 	};
 
 	Mesh* mesh = loadMesh(device, assets[0].path);
-	Mesh* cubeMesh = loadMesh(device, "Resources/cube.obj");
 
 	D3D11_DEPTH_STENCIL_DESC dsDesc = { 0 };
 	dsDesc.DepthEnable = true;
@@ -99,8 +106,12 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 	dsDesc.FrontFace = { D3D11_STENCIL_OP_KEEP, D3D11_STENCIL_OP_KEEP, D3D11_STENCIL_OP_KEEP, D3D11_COMPARISON_ALWAYS };
 	dsDesc.BackFace = { D3D11_STENCIL_OP_KEEP, D3D11_STENCIL_OP_KEEP, D3D11_STENCIL_OP_KEEP, D3D11_COMPARISON_ALWAYS };
 
-	ID3D11DepthStencilState* dsState = nullptr;
-	HRESULT hr = device.getDevice()->CreateDepthStencilState(&dsDesc, &dsState);
+	ID3D11DepthStencilState* cubeDs = nullptr;
+	HRESULT hr = device.getDevice()->CreateDepthStencilState(&dsDesc, &cubeDs);
+
+	ID3D11DepthStencilState* defaultDs = nullptr;
+	dsDesc.DepthFunc = D3D11_COMPARISON_LESS;
+	hr = device.getDevice()->CreateDepthStencilState(&dsDesc, &defaultDs);
 
 	if (FAILED(hr))
 		throw "Bite";
@@ -110,11 +121,101 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 	XMFLOAT3 rotation(0.0f, 0.0f, 0.0f);
 	XMFLOAT3 scale(1.0f, 1.0f, 1.0f);
 	float mouseScrollY = 0.0f;
+	bool drawTriedre = false;
 	CD3D11_VIEWPORT viewport;
 	D3D11_MAPPED_SUBRESOURCE cbRessource;
 	ImGuiIO& io = ImGui::GetIO();
-
 	MSG msg = { 0 };
+
+	Mesh* cubeMesh = loadMesh(device, "Resources/cube.obj", true);
+	Texture* texture = loadTextureHDR(device, "Resources/park_parking_4k.hdr");
+	TextureCube tc(device, 1024, 1024, 1);
+	Shader projectShader(device, L"project.hlsl", positionDesc, ARRAYSIZE(positionDesc));
+
+	ID3D11DepthStencilView* dsView = nullptr;
+	ID3D11Texture2D* depthStencilTexture = nullptr;
+	D3D11_TEXTURE2D_DESC depthStencilDesc = { 0 };
+	depthStencilDesc.Width = 1024;
+	depthStencilDesc.Height = 1024;
+	depthStencilDesc.MipLevels = 1;
+	depthStencilDesc.ArraySize = 1;
+	depthStencilDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+	depthStencilDesc.SampleDesc.Count = 1;
+	depthStencilDesc.SampleDesc.Quality = 0;
+	depthStencilDesc.Usage = D3D11_USAGE_DEFAULT;
+	depthStencilDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+	depthStencilDesc.CPUAccessFlags = 0;
+	depthStencilDesc.MiscFlags = 0;
+
+	hr = device.getDevice()->CreateTexture2D(&depthStencilDesc, nullptr, &depthStencilTexture);
+
+	// Check for error
+	if (FAILED(hr))
+		throw new std::exception("Error while creating depth stencil");
+
+	hr = device.getDevice()->CreateDepthStencilView(depthStencilTexture, nullptr, &dsView);
+
+	// Check for error
+	if (FAILED(hr))
+		throw new std::exception("Error while creating depth stencil view");
+
+	// Fill cubemap
+	XMMATRIX viewMatrices[6] =
+	{
+		XMMatrixTranspose(XMMatrixLookAtRH(XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f), XMVectorSet(1.0f, 0.0f, 0.0f, 1.0f), XMVectorSet(0.0f, -1.0f, 0.0f, 1.0f))),
+		XMMatrixTranspose(XMMatrixLookAtRH(XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f), XMVectorSet(-1.0f, 0.0f, 0.0f, 1.0f), XMVectorSet(0.0f, -1.0f, 0.0f, 1.0f))),
+		XMMatrixTranspose(XMMatrixLookAtRH(XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f), XMVectorSet(0.0f, -1.0f, 0.0f, 1.0f), XMVectorSet(0.0f, 0.0f, -1.0f, 1.0f))),
+		XMMatrixTranspose(XMMatrixLookAtRH(XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f), XMVectorSet(0.0f, 1.0f, 0.0f, 1.0f), XMVectorSet(0.0f, 0.0f, 1.0f, 1.0f))),
+		XMMatrixTranspose(XMMatrixLookAtRH(XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f), XMVectorSet(0.0f, 0.0f,1.0f, 1.0f), XMVectorSet(0.0f, -1.0f, 0.0f, 1.0f))),
+		XMMatrixTranspose(XMMatrixLookAtRH(XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f), XMVectorSet(0.0f, 0.0f, -1.0f, 1.0f), XMVectorSet(0.0f, -1.0f, 0.0f, 1.0f))),
+	};
+
+	for (int i = 0; i < 6; ++i)
+	{
+		viewport = CD3D11_VIEWPORT(0.f, 0.f, 1024.f, 1024.f);
+		ID3D11RenderTargetView* views = tc.getCubeFaceRTView(i);
+		device.getDeviceContext()->OMSetRenderTargets(1, &views, dsView);
+		device.getDeviceContext()->RSSetViewports(1, &viewport);
+		device.getDeviceContext()->ClearRenderTargetView(views, clearColor);
+		device.getDeviceContext()->ClearDepthStencilView(dsView, D3D11_CLEAR_DEPTH, 1.0f, 0);
+		device.getDeviceContext()->OMSetDepthStencilState(defaultDs, 0);
+
+		XMStoreFloat4x4(&cb.model, XMMatrixIdentity());
+		XMStoreFloat4x4(&cb.view, viewMatrices[i]);
+		XMStoreFloat4x4(
+			&cb.projection,
+			XMMatrixTranspose(XMMatrixPerspectiveFovRH(XMConvertToRadians(90.f), 1.0f, 0.1f, 10.f))
+		);
+		device.getDeviceContext()->Map(vsCb, 0, D3D11_MAP_WRITE_DISCARD, 0, &cbRessource);
+		memcpy(cbRessource.pData, &cb, sizeof(VSConstantBuffer));
+		device.getDeviceContext()->Unmap(vsCb, 0);
+
+		projectShader.bind(device);
+		device.getDeviceContext()->VSSetConstantBuffers(0, 1, &vsCb);
+		texture->bind(device, 0);
+		cubeMesh->bind(device);
+		cubeMesh->draw(device);
+	}
+
+	Shader colorShader(device, L"color.hlsl", colorDesc, ARRAYSIZE(colorDesc));
+	float triedreVertices[] =
+	{
+		0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
+		3.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
+
+		0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f,
+		0.0f, 3.0f, 0.0f, 0.0f, 1.0f, 0.0f,
+
+		0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f,
+		0.0f, 0.0f, 3.0f, 0.0f, 0.0f, 1.0f,
+	};
+	UINT triedreIndices[] =
+	{
+		0, 1, 2, 3, 4, 5
+	};
+	Mesh triedre(device, triedreVertices, sizeof(float) * 6, 6, triedreIndices, 6, D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
+
+	// Main loop
 	while (true)
 	{
 		if (PeekMessage(&msg, 0, 0, 0, PM_REMOVE))
@@ -126,7 +227,7 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 				break;
 		}
 
-		// Update
+		#pragma region Update
 		camera.setSize(window.getWidth(), window.getHeight());
 		camera.update(io.MouseDelta.x, io.MouseDelta.y, mouseScrollY, io.MouseDown[1], io.DeltaTime);
 		camera.computeMatrices();
@@ -140,12 +241,13 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 		cb.view = camera.getView();
 		cb.projection = camera.getProjection();
 		cb.viewPos = camera.getPosition();
+		#pragma endregion
 
+		#pragma region Render scene
 		device.getDeviceContext()->Map(vsCb, 0, D3D11_MAP_WRITE_DISCARD, 0, &cbRessource);
 		memcpy(cbRessource.pData, &cb, sizeof(VSConstantBuffer));
 		device.getDeviceContext()->Unmap(vsCb, 0);
 
-		// Render scene
 		viewport = CD3D11_VIEWPORT(0.f, 0.f, window.getWidth(), window.getHeight());
 
 		ID3D11RenderTargetView* renderTargets = window.getBackBufferRT();
@@ -156,38 +258,34 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 		device.getDeviceContext()->RSSetViewports(1, &viewport);
 		device.getDeviceContext()->ClearRenderTargetView(window.getBackBufferRT(), clearColor);
 		device.getDeviceContext()->ClearDepthStencilView(window.getBackBufferDS(), D3D11_CLEAR_DEPTH, 1.0f, 0);
-		device.getDeviceContext()->OMSetDepthStencilState(dsState, 0);
+		device.getDeviceContext()->OMSetDepthStencilState(defaultDs, 0);
 
-		device.getDeviceContext()->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-		// Model
-		device.getDeviceContext()->IASetInputLayout(shader.getInputLayout());
-		device.getDeviceContext()->IASetVertexBuffers(0, mesh->getNumBuffers(), mesh->getVertexBuffers(), mesh->getVertexStrides(), mesh->getVertexOffsets());
-		device.getDeviceContext()->IASetIndexBuffer(mesh->getIndexBuffer(), DXGI_FORMAT_R32_UINT, 0);
-
-		device.getDeviceContext()->VSSetShader(shader.getVertexShader(), nullptr, 0);
-		device.getDeviceContext()->PSSetShader(shader.getPixelShader(), nullptr, 0);
+		shader.bind(device);
 		device.getDeviceContext()->VSSetConstantBuffers(0, 1, &vsCb);
 		device.getDeviceContext()->PSSetConstantBuffers(0, 1, &vsCb);
-		device.getDeviceContext()->PSSetShaderResources(0, 1, &views);
-		device.getDeviceContext()->PSSetSamplers(0, 1, &samplers);
+		texture->bind(device, 0);
+		mesh->bind(device);
+		mesh->draw(device);
 
-		device.getDeviceContext()->DrawIndexed(mesh->getIndexCount(), 0, 0);
+		if (drawTriedre)
+		{
+			colorShader.bind(device);
+			device.getDeviceContext()->VSSetConstantBuffers(0, 1, &vsCb);
+			triedre.bind(device);
+			triedre.draw(device);
+		}
 
 		// Cubemap
-		//device.getDeviceContext()->IASetInputLayout(cubemapShader.getInputLayout());
-		//device.getDeviceContext()->IASetVertexBuffers(0, cubeMesh->getNumBuffers(), cubeMesh->getVertexBuffers(), cubeMesh->getVertexStrides(), cubeMesh->getVertexOffsets());
-		//device.getDeviceContext()->IASetIndexBuffer(cubeMesh->getIndexBuffer(), DXGI_FORMAT_R32_UINT, 0);
+		device.getDeviceContext()->OMSetDepthStencilState(cubeDs, 0);
 
-		//device.getDeviceContext()->VSSetShader(cubemapShader.getVertexShader(), nullptr, 0);
-		//device.getDeviceContext()->PSSetShader(cubemapShader.getPixelShader(), nullptr, 0);
-		//device.getDeviceContext()->VSSetConstantBuffers(0, 1, &vsCb);
-		//device.getDeviceContext()->PSSetShaderResources(0, 1, &views);
-		//device.getDeviceContext()->PSSetSamplers(0, 1, &samplers);
+		cubemapShader.bind(device);
+		device.getDeviceContext()->VSSetConstantBuffers(0, 1, &vsCb);
+		tc.bind(device, 0);
+		cubeMesh->bind(device);
+		cubeMesh->draw(device);
+		#pragma endregion
 
-		//device.getDeviceContext()->DrawIndexed(cubeMesh->getIndexCount(), 0, 0);
-
-		// Render GUI
+		#pragma region Render GUI
 		window.beginImGui();
 
 		ImGui::Begin("Debug");
@@ -216,8 +314,12 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 		{
 			if (ImGui::Button("Reload shaders"))
 			{
-				shader.reload(device.getDevice());
+				shader.reload(device);
+				colorShader.reload(device);
+				cubemapShader.reload(device);
 			}
+
+			ImGui::Checkbox("Show axes", &drawTriedre);
 		}
 
 		ImGui::End();
@@ -251,10 +353,17 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 		mouseScrollY = io.MouseWheel;
 
 		window.endImGui();
+		#pragma endregion
+
 		window.present();
 	}
 
 	delete mesh;
+	delete cubeMesh;
+	delete texture;
+	vsCb->Release();
+	cubeDs->Release();
+	defaultDs->Release();
 
 	return 0;
 }

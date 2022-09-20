@@ -1,6 +1,6 @@
 #include "Texture.hpp"
 
-Texture::Texture(ID3D11Device* device, int width, int height, void* data, UINT pixelSize, DXGI_FORMAT format, bool renderable)
+Texture::Texture(const GraphicsDevice& device, int width, int height, void* data, UINT pixelSize, DXGI_FORMAT format, bool renderable)
 	: _texture(nullptr), _textureView(nullptr), _sampler(nullptr), _rtView(nullptr)
 {
 	D3D11_TEXTURE2D_DESC textureDesc = { 0 };
@@ -19,7 +19,7 @@ Texture::Texture(ID3D11Device* device, int width, int height, void* data, UINT p
 	textureData.pSysMem = data;
 	textureData.SysMemPitch = pixelSize * width;
 
-	HRESULT hr = device->CreateTexture2D(&textureDesc, &textureData, &_texture);
+	HRESULT hr = device.getDevice()->CreateTexture2D(&textureDesc, &textureData, &_texture);
 
 	if (FAILED(hr))
 		throw std::exception("Cannot create texture");
@@ -30,7 +30,7 @@ Texture::Texture(ID3D11Device* device, int width, int height, void* data, UINT p
 	textureViewDesc.Texture2D.MipLevels = textureDesc.MipLevels;
 	textureViewDesc.Texture2D.MostDetailedMip = 0;
 
-	hr = device->CreateShaderResourceView(_texture, &textureViewDesc, &_textureView);
+	hr = device.getDevice()->CreateShaderResourceView(_texture, &textureViewDesc, &_textureView);
 
 	if (FAILED(hr))
 		throw std::exception("Cannot create resource view");
@@ -51,14 +51,14 @@ Texture::Texture(ID3D11Device* device, int width, int height, void* data, UINT p
 	samplerDesc.MinLOD = 0;
 	samplerDesc.MaxLOD = D3D11_FLOAT32_MAX;
 
-	hr = device->CreateSamplerState(&samplerDesc, &_sampler);
+	hr = device.getDevice()->CreateSamplerState(&samplerDesc, &_sampler);
 
 	if (FAILED(hr))
 		throw std::exception("Cannot create sampler state");
 
 	if (renderable)
 	{
-		hr = device->CreateRenderTargetView(_texture, nullptr, &_rtView);
+		hr = device.getDevice()->CreateRenderTargetView(_texture, nullptr, &_rtView);
 
 		if (FAILED(hr))
 			throw std::exception("Cannot create render target view");
@@ -67,7 +67,8 @@ Texture::Texture(ID3D11Device* device, int width, int height, void* data, UINT p
 
 Texture::~Texture()
 {
-	_rtView->Release();
+	if (_rtView)
+		_rtView->Release();
 	_sampler->Release();
 	_textureView->Release();
 	_texture->Release();
@@ -88,10 +89,14 @@ ID3D11RenderTargetView* Texture::getRTView()
 	return _rtView;
 }
 
+void Texture::bind(const GraphicsDevice& device, int slot)
+{
+	device.getDeviceContext()->PSSetShaderResources(slot, 1, &_textureView);
+	device.getDeviceContext()->PSSetSamplers(slot, 1, &_sampler);
+}
 
 
-
-TextureCube::TextureCube(ID3D11Device* device, int width, int height, int mipLevels)
+TextureCube::TextureCube(const GraphicsDevice& device, int width, int height, int mipLevels)
 	: _texture(nullptr), _textureView(nullptr), _sampler(nullptr), _facesRTView()
 {
 	D3D11_TEXTURE2D_DESC textureDesc = { 0 };
@@ -105,7 +110,7 @@ TextureCube::TextureCube(ID3D11Device* device, int width, int height, int mipLev
 	textureDesc.ArraySize = 6;
 	textureDesc.MiscFlags = D3D11_RESOURCE_MISC_TEXTURECUBE;
 
-	HRESULT hr = device->CreateTexture2D(&textureDesc, nullptr, &_texture);
+	HRESULT hr = device.getDevice()->CreateTexture2D(&textureDesc, nullptr, &_texture);
 
 	if (FAILED(hr))
 		throw std::exception("Cannot create texture");
@@ -116,7 +121,7 @@ TextureCube::TextureCube(ID3D11Device* device, int width, int height, int mipLev
 	textureViewDesc.TextureCube.MipLevels = textureDesc.MipLevels;
 	textureViewDesc.TextureCube.MostDetailedMip = 0;
 
-	hr = device->CreateShaderResourceView(_texture, &textureViewDesc, &_textureView);
+	hr = device.getDevice()->CreateShaderResourceView(_texture, &textureViewDesc, &_textureView);
 
 	if (FAILED(hr))
 		throw std::exception("Cannot create resource view");
@@ -137,7 +142,7 @@ TextureCube::TextureCube(ID3D11Device* device, int width, int height, int mipLev
 	samplerDesc.MinLOD = 0;
 	samplerDesc.MaxLOD = D3D11_FLOAT32_MAX;
 
-	hr = device->CreateSamplerState(&samplerDesc, &_sampler);
+	hr = device.getDevice()->CreateSamplerState(&samplerDesc, &_sampler);
 
 	if (FAILED(hr))
 		throw std::exception("Cannot create sampler state");
@@ -146,13 +151,13 @@ TextureCube::TextureCube(ID3D11Device* device, int width, int height, int mipLev
 	{
 		D3D11_RENDER_TARGET_VIEW_DESC rtDesc = CD3D11_RENDER_TARGET_VIEW_DESC(
 			_texture,
-			D3D11_RTV_DIMENSION_TEXTURE2D,
+			D3D11_RTV_DIMENSION_TEXTURE2DARRAY,
 			DXGI_FORMAT_R32G32B32A32_FLOAT,
 			0,
 			i,
 			1
 		);
-		hr = device->CreateRenderTargetView(_texture, &rtDesc, &_facesRTView[i]);
+		hr = device.getDevice()->CreateRenderTargetView(_texture, &rtDesc, &_facesRTView[i]);
 
 		if (FAILED(hr))
 			throw std::exception("Cannot create render target view for cube face");
@@ -181,4 +186,10 @@ ID3D11RenderTargetView* TextureCube::getCubeFaceRTView(int face)
 ID3D11SamplerState* TextureCube::getSampler()
 {
 	return _sampler;
+}
+
+void TextureCube::bind(const GraphicsDevice& device, int slot)
+{
+	device.getDeviceContext()->PSSetShaderResources(slot, 1, &_textureView);
+	device.getDeviceContext()->PSSetSamplers(slot, 1, &_sampler);
 }

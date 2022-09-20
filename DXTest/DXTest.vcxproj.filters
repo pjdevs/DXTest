@@ -88,5 +88,8 @@
     <FxCompile Include="project.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
+    <FxCompile Include="color.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>
