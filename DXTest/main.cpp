@@ -122,17 +122,9 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 	Texture* texture = loadTextureHDR(device, "Resources/park_parking_4k.hdr");
 	TextureCube tc(device, 2048, 2048, 1);
 	Shader projectShader(device, L"project.hlsl", positionDesc, ARRAYSIZE(positionDesc));
+	CubeCamera cubeCamera;
 
 	// Fill cubemap
-	XMMATRIX viewMatrices[6] =
-	{
-		XMMatrixTranspose(XMMatrixLookAtRH(XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f), XMVectorSet(1.0f, 0.0f, 0.0f, 1.0f), XMVectorSet(0.0f, -1.0f, 0.0f, 1.0f))),
-		XMMatrixTranspose(XMMatrixLookAtRH(XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f), XMVectorSet(-1.0f, 0.0f, 0.0f, 1.0f), XMVectorSet(0.0f, -1.0f, 0.0f, 1.0f))),
-		XMMatrixTranspose(XMMatrixLookAtRH(XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f), XMVectorSet(0.0f, -1.0f, 0.0f, 1.0f), XMVectorSet(0.0f, 0.0f, -1.0f, 1.0f))),
-		XMMatrixTranspose(XMMatrixLookAtRH(XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f), XMVectorSet(0.0f, 1.0f, 0.0f, 1.0f), XMVectorSet(0.0f, 0.0f, 1.0f, 1.0f))),
-		XMMatrixTranspose(XMMatrixLookAtRH(XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f), XMVectorSet(0.0f, 0.0f,1.0f, 1.0f), XMVectorSet(0.0f, -1.0f, 0.0f, 1.0f))),
-		XMMatrixTranspose(XMMatrixLookAtRH(XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f), XMVectorSet(0.0f, 0.0f, -1.0f, 1.0f), XMVectorSet(0.0f, -1.0f, 0.0f, 1.0f))),
-	};
 
 	for (int i = 0; i < 6; ++i)
 	{
@@ -143,12 +135,11 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 		device.getDeviceContext()->ClearRenderTargetView(views, clearColor);
 		device.getDeviceContext()->OMSetDepthStencilState(defaultDs, 0);
 
+		cubeCamera.face(i);
+
 		XMStoreFloat4x4(&cb.model, XMMatrixIdentity());
-		XMStoreFloat4x4(&cb.view, viewMatrices[i]);
-		XMStoreFloat4x4(
-			&cb.projection,
-			XMMatrixTranspose(XMMatrixPerspectiveFovRH(XMConvertToRadians(90.f), 1.0f, 0.1f, 10.f))
-		);
+		cb.view = cubeCamera.getView();
+		cb.projection = cubeCamera.getProjection();
 		device.getDeviceContext()->Map(vsCb, 0, D3D11_MAP_WRITE_DISCARD, 0, &cbRessource);
 		memcpy(cbRessource.pData, &cb, sizeof(VSConstantBuffer));
 		device.getDeviceContext()->Unmap(vsCb, 0);
