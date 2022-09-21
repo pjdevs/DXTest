@@ -118,38 +118,68 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 	ImGuiIO& io = ImGui::GetIO();
 	MSG msg = { 0 };
 
+	#pragma region Project cubemap
 	Mesh* cubeMesh = loadMesh(device, "Resources/cube.obj", true);
-	Texture* texture = loadTextureHDR(device, "Resources/park_parking_4k.hdr");
-	TextureCube tc(device, 2048, 2048, 1);
+	Texture* texture = loadTextureHDR(device, "Resources/shanghai_bund_4k.hdr");
+	TextureCube tc(device, 256, 256, 1);
 	Shader projectShader(device, L"project.hlsl", positionDesc, ARRAYSIZE(positionDesc));
 	CubeCamera cubeCamera;
 
 	// Fill cubemap
+	viewport = CD3D11_VIEWPORT(0.f, 0.f, 256.f, 256.f);
+	device.getDeviceContext()->RSSetViewports(1, &viewport);
+	device.getDeviceContext()->OMSetDepthStencilState(defaultDs, 0);
+	XMStoreFloat4x4(&cb.model, XMMatrixIdentity());
+	cb.projection = cubeCamera.getProjection();
+
+	projectShader.bind(device);
+	device.getDeviceContext()->VSSetConstantBuffers(0, 1, &vsCb);
+	texture->bind(device, 0);
+	cubeMesh->bind(device);
 
 	for (int i = 0; i < 6; ++i)
 	{
-		viewport = CD3D11_VIEWPORT(0.f, 0.f, 2048.f, 2048.f);
 		ID3D11RenderTargetView* views = tc.getCubeFaceRTView(i);
-		device.getDeviceContext()->OMSetRenderTargets(1, &views, nullptr);
-		device.getDeviceContext()->RSSetViewports(1, &viewport);
 		device.getDeviceContext()->ClearRenderTargetView(views, clearColor);
-		device.getDeviceContext()->OMSetDepthStencilState(defaultDs, 0);
+		device.getDeviceContext()->OMSetRenderTargets(1, &views, nullptr);
 
 		cubeCamera.face(i);
-
-		XMStoreFloat4x4(&cb.model, XMMatrixIdentity());
 		cb.view = cubeCamera.getView();
-		cb.projection = cubeCamera.getProjection();
 		device.getDeviceContext()->Map(vsCb, 0, D3D11_MAP_WRITE_DISCARD, 0, &cbRessource);
 		memcpy(cbRessource.pData, &cb, sizeof(VSConstantBuffer));
 		device.getDeviceContext()->Unmap(vsCb, 0);
 
-		projectShader.bind(device);
-		device.getDeviceContext()->VSSetConstantBuffers(0, 1, &vsCb);
-		texture->bind(device, 0);
-		cubeMesh->bind(device);
 		cubeMesh->draw(device);
 	}
+	#pragma endregion
+
+	#pragma region Irradiance
+	TextureCube irradiance(device, 32, 32, 1);
+	Shader irradianceShader(device, L"irradiance.hlsl", positionDesc, ARRAYSIZE(positionDesc));
+
+	viewport = CD3D11_VIEWPORT(0.0f, 0.0f, 32.0f, 32.0f);
+	device.getDeviceContext()->RSSetViewports(1, &viewport);
+
+	irradianceShader.bind(device);
+	device.getDeviceContext()->VSSetConstantBuffers(0, 1, &vsCb);
+	cubeMesh->bind(device);
+
+	for (int i = 0; i < 6; ++i)
+	{
+		ID3D11RenderTargetView* views = irradiance.getCubeFaceRTView(i);
+		device.getDeviceContext()->ClearRenderTargetView(views, clearColor);
+		device.getDeviceContext()->OMSetRenderTargets(1, &views, nullptr);
+		tc.bind(device, 0);
+
+		cubeCamera.face(i);
+		cb.view = cubeCamera.getView();
+		device.getDeviceContext()->Map(vsCb, 0, D3D11_MAP_WRITE_DISCARD, 0, &cbRessource);
+		memcpy(cbRessource.pData, &cb, sizeof(VSConstantBuffer));
+		device.getDeviceContext()->Unmap(vsCb, 0);
+
+		cubeMesh->draw(device);
+	}
+	#pragma endregion
 
 	Shader colorShader(device, L"color.hlsl", colorDesc, ARRAYSIZE(colorDesc));
 	float triedreVertices[] =
@@ -163,10 +193,7 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 		0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f,
 		0.0f, 0.0f, 3.0f, 0.0f, 0.0f, 1.0f,
 	};
-	UINT triedreIndices[] =
-	{
-		0, 1, 2, 3, 4, 5
-	};
+	UINT triedreIndices[] = { 0, 1, 2, 3, 4, 5 };
 	Mesh triedre(device, triedreVertices, sizeof(float) * 6, 6, triedreIndices, 6, D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
 
 	// Main loop
@@ -217,7 +244,7 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 		shader.bind(device);
 		device.getDeviceContext()->VSSetConstantBuffers(0, 1, &vsCb);
 		device.getDeviceContext()->PSSetConstantBuffers(0, 1, &vsCb);
-		tc.bind(device, 0);
+		irradiance.bind(device, 0);
 		mesh->bind(device);
 		mesh->draw(device);
 

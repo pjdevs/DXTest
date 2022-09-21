@@ -94,5 +94,8 @@
     <FxCompile Include="IBL.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
+    <FxCompile Include="irradiance.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>

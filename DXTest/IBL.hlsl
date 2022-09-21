@@ -1,4 +1,4 @@
-TextureCube env : register(t0);
+TextureCube irradianceMap : register(t0);
 SamplerState envSampler : register(s0);
 
 cbuffer VSConstantBuffer : register(b0)
@@ -38,14 +38,33 @@ VS_OUT VSMain(VS_IN input)
     return output;
 }
 
+float3 FresnelSchlickRoughness(float cosTheta, float3 F0, float roughness)
+{
+    float smoothness = 1.0 - roughness;
+    return F0 + (max(float3(smoothness, smoothness, smoothness), F0) - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}
+
 float4 PSMain(VS_OUT input) : SV_TARGET
 {
     float3 normal = normalize(input.normal);
     float3 viewDir = normalize(viewPos - input.worldPos);
-    float3 reflectedViewDir = reflect(-viewDir, normal);
-    float3 light = env.Sample(envSampler, reflectedViewDir);
-    float3 result = lerp(float3(0.8, 0.1, 0.1), light, 0.25);
+    //float3 reflectedViewDir = reflect(-viewDir, normal);
+    //float3 light = env.Sample(envSampler, reflectedViewDir);
+    //float3 result = lerp(float3(0.8, 0.1, 0.1), light, 0.25);
     
+    const float3 albedo = float3(0.8, 0.1, 0.1);
+    const float roughness = 0.1;
+    const float ao = 1.0;
+
+    // Ambient
+    const float3 F0 = float3(0.04, 0.04, 0.04);
+    float3 kS = FresnelSchlickRoughness(saturate(dot(normal, viewDir)), F0, roughness);
+    float3 kD = 1.0 - kS;
+    float3 irradiance = irradianceMap.Sample(envSampler, normal).rgb;
+    float3 diffuse = irradiance * albedo;
+    float3 ambient = (kD * diffuse) * ao;
+    
+    float3 result = ambient;
     result /= (result + 1.0);
     
     return float4(result, 1.0f);

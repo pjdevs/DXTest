@@ -3,12 +3,25 @@
 GraphicsDevice::GraphicsDevice()
 	: _device(nullptr), _deviceContext(nullptr)
 {
+	IDXGIAdapter* pAdapter;
+	std::vector<IDXGIAdapter*> vAdapters;
+	IDXGIFactory* pFactory = nullptr;
+
+	// Create a DXGIFactory object.
+	if (FAILED(CreateDXGIFactory(__uuidof(IDXGIFactory), (void**)&pFactory)))
+		throw "Failed";
+
+	for (UINT i = 0; pFactory->EnumAdapters(i, &pAdapter) != DXGI_ERROR_NOT_FOUND; ++i)
+		vAdapters.push_back(pAdapter);
+
+	pFactory->Release();
+
 	D3D_FEATURE_LEVEL featureLevels[] = { D3D_FEATURE_LEVEL_11_1 };
 	D3D_FEATURE_LEVEL level;
 
 	HRESULT hr = D3D11CreateDevice(
-		nullptr,
-		D3D_DRIVER_TYPE_HARDWARE,
+		vAdapters[1],
+		D3D_DRIVER_TYPE_UNKNOWN,
 		nullptr,
 		D3D11_CREATE_DEVICE_DEBUG,
 		featureLevels,

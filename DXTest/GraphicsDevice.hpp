@@ -2,6 +2,8 @@
 
 #include <exception>
 #include <d3d11.h>
+#include <dxgi.h>
+#include <vector>
 
 class GraphicsDevice
 {

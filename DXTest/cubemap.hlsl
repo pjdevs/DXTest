@@ -28,7 +28,7 @@ VS_OUT VSMain(VS_IN input)
     viewUntranslated._m32 = 0.0;
     viewUntranslated._m31 = 0.0;
     
-    output.direction = input.position.xyz;
+    output.direction = input.position;
     output.position = mul(mul(float4(input.position, 1.0), viewUntranslated), projection);
     output.position = output.position.xyww;
 
@@ -39,6 +39,7 @@ float4 PSMain(VS_OUT input) : SV_TARGET
 {
     float3 result = tex.Sample(textureSampler, input.direction);
     result /= (result + 1.0);
-    //(input.direction + 1.0) * 0.5
+    result = pow(result, 1.0/2.2);
+    
     return float4(result, 1.0);
 }
