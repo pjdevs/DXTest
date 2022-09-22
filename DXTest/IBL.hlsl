@@ -1,4 +1,5 @@
-TextureCube irradianceMap : register(t0);
+TextureCube envMap : register(t0);
+TextureCube irradianceMap : register(t1);
 SamplerState envSampler : register(s0);
 
 cbuffer VSConstantBuffer : register(b0)
@@ -48,15 +49,12 @@ float4 PSMain(VS_OUT input) : SV_TARGET
 {
     float3 normal = normalize(input.normal);
     float3 viewDir = normalize(viewPos - input.worldPos);
-    //float3 reflectedViewDir = reflect(-viewDir, normal);
-    //float3 light = env.Sample(envSampler, reflectedViewDir);
-    //float3 result = lerp(float3(0.8, 0.1, 0.1), light, 0.25);
     
     const float3 albedo = float3(0.8, 0.1, 0.1);
-    const float roughness = 0.1;
+    const float roughness = 0.5;
     const float ao = 1.0;
 
-    // Ambient
+    // Diffuse IBL
     const float3 F0 = float3(0.04, 0.04, 0.04);
     float3 kS = FresnelSchlickRoughness(saturate(dot(normal, viewDir)), F0, roughness);
     float3 kD = 1.0 - kS;
@@ -64,7 +62,11 @@ float4 PSMain(VS_OUT input) : SV_TARGET
     float3 diffuse = irradiance * albedo;
     float3 ambient = (kD * diffuse) * ao;
     
-    float3 result = ambient;
+    // Trick for reflection
+    float3 reflectedViewDir = reflect(-viewDir, normal);
+    float3 reflection = envMap.Sample(envSampler, reflectedViewDir) * (1.0 - roughness);
+    
+    float3 result = lerp(ambient, reflection, (1.0 - roughness));
     result /= (result + 1.0);
     
     return float4(result, 1.0f);

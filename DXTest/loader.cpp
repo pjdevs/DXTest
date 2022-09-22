@@ -53,12 +53,25 @@ MeshData* loadMeshData(const std::string& path, bool flip)
 Texture* loadTexture(const GraphicsDevice& device, const std::string& path)
 {
 	int imWidth, imHeight, imChannels;
-	stbi_uc* imData = stbi_load(path.c_str(), &imWidth, &imHeight, &imChannels, 0);
+	stbi_uc* imData = stbi_load(path.c_str(), &imWidth, &imHeight, &imChannels, 4);
 
 	if (imData == nullptr)
 		throw std::exception("Cannot load texture file");
 
-	Texture* texture = new Texture(device, imWidth, imHeight, imData, 4 * sizeof(float), DXGI_FORMAT_R8G8B8A8_UINT);
+	Texture* texture = new Texture(
+		device,
+		imWidth,
+		imHeight,
+		4 * sizeof(float),
+		1,
+		1,
+		DXGI_FORMAT_R8G8B8A8_UINT,
+		D3D11_USAGE_IMMUTABLE,
+		D3D11_BIND_SHADER_RESOURCE,
+		0,
+		D3D_SRV_DIMENSION_TEXTURE2D,
+		imData
+	);
 
 	stbi_image_free(imData);
 
@@ -68,15 +81,43 @@ Texture* loadTexture(const GraphicsDevice& device, const std::string& path)
 
 Texture* loadTextureHDR(const GraphicsDevice& device, const std::string& path)
 {
-	int imWidth, imHeight, imChannels;
-	float* imData = stbi_loadf(path.c_str(), &imWidth, &imHeight, &imChannels, 0);
+	int width, height, channels;
+	float* imData = stbi_loadf(path.c_str(), &width, &height, &channels, 3);
 
 	if (imData == nullptr)
 		throw std::exception("Cannot load texture file");
 
-	Texture* texture = new Texture(device, imWidth, imHeight, imData, 3 * sizeof(float), DXGI_FORMAT_R32G32B32_FLOAT);
+	int size = width * height;
+	float* imDataA = new float[size * 4];
+
+	for (int i = 0; i < size; ++i)
+	{
+		int rgba = i * 4;
+		int rgb = i * 3;
+
+		imDataA[rgba] = imData[rgb];
+		imDataA[rgba + 1] = imData[rgb + 1];
+		imDataA[rgba + 2] = imData[rgb + 2];
+		imDataA[rgba + 3] = 1.0f;
+	}
+
+	Texture* texture = new Texture(
+		device,
+		width,
+		height,
+		4 * sizeof(float),
+		1,
+		1,
+		DXGI_FORMAT_R32G32B32A32_FLOAT,
+		D3D11_USAGE_IMMUTABLE,
+		D3D11_BIND_SHADER_RESOURCE,
+		0,
+		D3D_SRV_DIMENSION_TEXTURE2D,
+		imDataA
+	);
 
 	stbi_image_free(imData);
+	delete[] imDataA;
 
 	return texture;
 }

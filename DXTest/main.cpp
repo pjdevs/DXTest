@@ -113,6 +113,7 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 	XMFLOAT3 scale(1.0f, 1.0f, 1.0f);
 	float mouseScrollY = 0.0f;
 	bool drawTriedre = false;
+	bool showIrradiance = false;
 	CD3D11_VIEWPORT viewport;
 	D3D11_MAPPED_SUBRESOURCE cbRessource;
 	ImGuiIO& io = ImGui::GetIO();
@@ -121,12 +122,19 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 	#pragma region Project cubemap
 	Mesh* cubeMesh = loadMesh(device, "Resources/cube.obj", true);
 	Texture* texture = loadTextureHDR(device, "Resources/shanghai_bund_4k.hdr");
-	TextureCube tc(device, 256, 256, 1);
+	Texture cubemap(
+		device,
+		512, 512, 4 * sizeof(float),
+		1, 6, DXGI_FORMAT_R32G32B32A32_FLOAT,
+		D3D11_USAGE_DEFAULT, D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE,
+		D3D11_RESOURCE_MISC_TEXTURECUBE, D3D11_SRV_DIMENSION_TEXTURECUBE,
+		nullptr
+	);
 	Shader projectShader(device, L"project.hlsl", positionDesc, ARRAYSIZE(positionDesc));
 	CubeCamera cubeCamera;
 
 	// Fill cubemap
-	viewport = CD3D11_VIEWPORT(0.f, 0.f, 256.f, 256.f);
+	viewport = CD3D11_VIEWPORT(0.f, 0.f, 512.f, 512.f);
 	device.getDeviceContext()->RSSetViewports(1, &viewport);
 	device.getDeviceContext()->OMSetDepthStencilState(defaultDs, 0);
 	XMStoreFloat4x4(&cb.model, XMMatrixIdentity());
@@ -139,7 +147,7 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 
 	for (int i = 0; i < 6; ++i)
 	{
-		ID3D11RenderTargetView* views = tc.getCubeFaceRTView(i);
+		ID3D11RenderTargetView* views = cubemap.getRenderTargetView(device, i);
 		device.getDeviceContext()->ClearRenderTargetView(views, clearColor);
 		device.getDeviceContext()->OMSetRenderTargets(1, &views, nullptr);
 
@@ -150,11 +158,19 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 		device.getDeviceContext()->Unmap(vsCb, 0);
 
 		cubeMesh->draw(device);
+		views->Release();
 	}
 	#pragma endregion
 
 	#pragma region Irradiance
-	TextureCube irradiance(device, 32, 32, 1);
+	Texture irradiance(
+		device,
+		32, 32, 4 * sizeof(float),
+		1, 6, DXGI_FORMAT_R32G32B32A32_FLOAT,
+		D3D11_USAGE_DEFAULT, D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE,
+		D3D11_RESOURCE_MISC_TEXTURECUBE, D3D11_SRV_DIMENSION_TEXTURECUBE,
+		nullptr
+	);
 	Shader irradianceShader(device, L"irradiance.hlsl", positionDesc, ARRAYSIZE(positionDesc));
 
 	viewport = CD3D11_VIEWPORT(0.0f, 0.0f, 32.0f, 32.0f);
@@ -166,10 +182,11 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 
 	for (int i = 0; i < 6; ++i)
 	{
-		ID3D11RenderTargetView* views = irradiance.getCubeFaceRTView(i);
+		ID3D11RenderTargetView* views = irradiance.getRenderTargetView(device, i);
+
 		device.getDeviceContext()->ClearRenderTargetView(views, clearColor);
 		device.getDeviceContext()->OMSetRenderTargets(1, &views, nullptr);
-		tc.bind(device, 0);
+		cubemap.bind(device, 0);
 
 		cubeCamera.face(i);
 		cb.view = cubeCamera.getView();
@@ -178,6 +195,7 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 		device.getDeviceContext()->Unmap(vsCb, 0);
 
 		cubeMesh->draw(device);
+		views->Release();
 	}
 	#pragma endregion
 
@@ -244,7 +262,8 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 		shader.bind(device);
 		device.getDeviceContext()->VSSetConstantBuffers(0, 1, &vsCb);
 		device.getDeviceContext()->PSSetConstantBuffers(0, 1, &vsCb);
-		irradiance.bind(device, 0);
+		cubemap.bind(device, 0);
+		irradiance.bind(device, 1);
 		mesh->bind(device);
 		mesh->draw(device);
 
@@ -261,7 +280,12 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 
 		cubemapShader.bind(device);
 		device.getDeviceContext()->VSSetConstantBuffers(0, 1, &vsCb);
-		tc.bind(device, 0);
+
+		if (showIrradiance)
+			irradiance.bind(device, 0);
+		else
+			cubemap.bind(device, 0);
+		
 		cubeMesh->bind(device);
 		cubeMesh->draw(device);
 		#pragma endregion
@@ -300,7 +324,8 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 				cubemapShader.reload(device);
 			}
 
-			ImGui::Checkbox("Show axes", &drawTriedre);
+			ImGui::Checkbox("Show Axes", &drawTriedre);
+			ImGui::Checkbox("Show Irradiance", &showIrradiance);
 		}
 
 		ImGui::End();
@@ -329,6 +354,7 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 		ImGui::DragFloat3("Position", (float*)(&position), 0.1f);
 		ImGui::DragFloat3("Rotation", (float*)(&rotation), 0.1f);
 		ImGui::DragFloat3("Scale", (float*)(&scale), 0.1f);
+
 		ImGui::End();
 		
 		mouseScrollY = io.MouseWheel;
