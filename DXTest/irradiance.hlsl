@@ -39,7 +39,7 @@ float4 PSMain(VS_OUT input) : SV_TARGET
     
     float3 irradiance = float3(0.0, 0.0, 0.0);
 
-    float sampleDelta = 0.005;
+    float sampleDelta = 0.01;
     float nrSamples = 0.0;
     for (float phi = 0.0; phi < 2.0 * PI; phi += sampleDelta)
     {

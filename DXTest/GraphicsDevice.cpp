@@ -12,11 +12,19 @@ GraphicsDevice::GraphicsDevice()
 		throw "Failed";
 
 	for (UINT i = 0; pFactory->EnumAdapters(i, &pAdapter) != DXGI_ERROR_NOT_FOUND; ++i)
+	{
 		vAdapters.push_back(pAdapter);
+	
+		DXGI_ADAPTER_DESC desc;
+		pAdapter->GetDesc(&desc);
+
+		OutputDebugString(desc.Description);
+		OutputDebugString(L"\n");
+	}
 
 	pFactory->Release();
 
-	D3D_FEATURE_LEVEL featureLevels[] = { D3D_FEATURE_LEVEL_11_1 };
+	D3D_FEATURE_LEVEL featureLevels[] = { D3D_FEATURE_LEVEL_11_0 };
 	D3D_FEATURE_LEVEL level;
 
 	HRESULT hr = D3D11CreateDevice(
@@ -32,8 +40,8 @@ GraphicsDevice::GraphicsDevice()
 		&_deviceContext
 	);
 
-	if (level != D3D_FEATURE_LEVEL_11_1 || FAILED(hr))
-		throw std::exception("Direct3D 11.1 must be supported");
+	if (level != D3D_FEATURE_LEVEL_11_0 || FAILED(hr))
+		throw std::exception("Direct3D 11.0 must be supported");
 }
 
 ID3D11Device* GraphicsDevice::getDevice() const

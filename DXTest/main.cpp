@@ -29,6 +29,16 @@ struct VSConstantBuffer
 	float padding;
 };
 
+struct MaterialConstantBuffer
+{
+	XMFLOAT3 albedo;
+	float metallic;
+	float roughness;
+	XMFLOAT3 emissive;
+	float ao;
+	float p1, p2, p3;
+};
+
 struct Asset
 {
 	std::string name;
@@ -75,6 +85,14 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 	VSConstantBuffer cb {};
 	ID3D11Buffer* vsCb = device.createBuffer(&cb, sizeof(VSConstantBuffer), D3D11_USAGE_DYNAMIC, D3D11_BIND_CONSTANT_BUFFER, D3D11_CPU_ACCESS_WRITE);
 
+	MaterialConstantBuffer material {};
+	material.albedo = XMFLOAT3(1.0f, 1.0f, 1.0f);
+	material.metallic = 1.0f;
+	material.roughness = 1.0f;
+	material.ao = 1.0f;
+	material.emissive = XMFLOAT3(1.0f, 1.0f, 1.0f);
+	ID3D11Buffer* materialCb = device.createBuffer(&material, sizeof(MaterialConstantBuffer), D3D11_USAGE_DYNAMIC, D3D11_BIND_CONSTANT_BUFFER, D3D11_CPU_ACCESS_WRITE);
+
 	Asset assets[] =
 	{
 		{ "Plane", "Resources/plane.obj", false },
@@ -85,7 +103,7 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 		{ "Damaged Helmet", "Resources/DamagedHelmet/DamagedHelmet.gltf", false }
 	};
 
-	Mesh* mesh = loadMesh(device, assets[0].path);
+	Mesh* mesh = loadMesh(device, assets[5].path);
 
 	D3D11_DEPTH_STENCIL_DESC dsDesc = { 0 };
 	dsDesc.DepthEnable = true;
@@ -214,6 +232,11 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 	UINT triedreIndices[] = { 0, 1, 2, 3, 4, 5 };
 	Mesh triedre(device, triedreVertices, sizeof(float) * 6, 6, triedreIndices, 6, D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
 
+	Texture* albedo = loadTexture(device, "Resources/DamagedHelmet/Default_albedo.jpg");
+	Texture* metalRoughness = loadTexture(device, "Resources/DamagedHelmet/Default_metalRoughness.jpg");
+	Texture* ao = loadTexture(device, "Resources/DamagedHelmet/Default_AO.jpg");
+	Texture* emissive = loadTexture(device, "Resources/DamagedHelmet/Default_emissive.jpg");
+
 	// Main loop
 	while (true)
 	{
@@ -262,8 +285,14 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 		shader.bind(device);
 		device.getDeviceContext()->VSSetConstantBuffers(0, 1, &vsCb);
 		device.getDeviceContext()->PSSetConstantBuffers(0, 1, &vsCb);
+		device.getDeviceContext()->PSSetConstantBuffers(1, 1, &materialCb);
 		cubemap.bind(device, 0);
 		irradiance.bind(device, 1);
+		albedo->bind(device, 4);
+		metalRoughness->bind(device, 5);
+		ao->bind(device, 7);
+		emissive->bind(device, 8);
+
 		mesh->bind(device);
 		mesh->draw(device);
 
@@ -368,7 +397,12 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 	delete mesh;
 	delete cubeMesh;
 	delete texture;
+	delete albedo;
+	delete metalRoughness;
+	delete ao;
+	delete emissive;
 	vsCb->Release();
+	materialCb->Release();
 	cubeDs->Release();
 	defaultDs->Release();
 

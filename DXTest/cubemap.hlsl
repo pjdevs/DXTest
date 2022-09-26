@@ -41,5 +41,5 @@ float4 PSMain(VS_OUT input) : SV_TARGET
     result /= (result + 1.0);
     result = pow(result, 1.0/2.2);
     
-    return float4(result, 1.0);
+    return float4(result, 1.0); 
 }
