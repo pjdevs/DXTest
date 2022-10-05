@@ -75,33 +75,41 @@ float4 PSMain(VS_OUT input) : SV_TARGET
     
     // Sample maps
     float3 metallicRoughness = metallicRoughnessMap.Sample(defaultSampler, input.uv);;
-    albedo *= albedoMap.Sample(defaultSampler, input.uv);
-    metallic *= metallicRoughness.r;
-    roughness *= metallicRoughness.g;
+    albedo = albedoMap.Sample(defaultSampler, input.uv);
+    metallic = metallicRoughness.b;
+    roughness = metallicRoughness.g;
     //normal *= normalMap.Sample(defaultSampler, input.uv);
-    ao *= aoMap.Sample(defaultSampler, input.uv);
-    emissive *= emissiveMap.Sample(defaultSampler, input.uv);
-    
+    ao = aoMap.Sample(defaultSampler, input.uv);
+    emissive = emissiveMap.Sample(defaultSampler, input.uv);
+
     // Setup usefull vectors
     float3 viewDir = normalize(viewPos - input.worldPos);
 
+    // IBL
+    float3 F0 = float3(0.04, 0.04, 0.04);
+    F0 = lerp(F0, albedo, metallic);
+    float3 F = FresnelSchlickRoughness(saturate(dot(normal, viewDir)), F0, roughness);
+    float3 kS = F;
+    float3 kD = (1.0 - kS) * (1.0 - metallic);
+    
     // Diffuse IBL
-    const float3 F0 = float3(0.04, 0.04, 0.04);
-    float3 kS = FresnelSchlickRoughness(saturate(dot(normal, viewDir)), F0, roughness);
-    float3 kD = 1.0 - kS;
     float3 irradiance = irradianceMap.Sample(defaultSampler, normal).rgb;
     float3 diffuse = irradiance * albedo;
-    float3 ambient = (kD * diffuse) * ao + emissive;
     
-    // Trick for reflection
-    float3 reflectedViewDir = reflect(-viewDir, normal);
-    float3 reflection = envMap.Sample(defaultSampler, reflectedViewDir);
-    
+    // Specular IBL
+    float3 R = reflect(-viewDir, normal);
+    const float MAX_REFLECTION_LOD = 4.0;
+    float3 prefilteredColor = preFilterMap.SampleLevel(defaultSampler, R, roughness * MAX_REFLECTION_LOD).rgb;
+    float2 envBRDF = brdfLUT.Sample(defaultSampler, float2(saturate(dot(normal, viewDir)), roughness)).rg;
+    float3 specular = prefilteredColor * (F * envBRDF.x + envBRDF.y);
+  
     // Final color
-    float3 result = lerp(ambient, reflection, (1.0 - roughness));
+    float3 ambient = (kD * diffuse + specular) * ao + emissive;
+    float3 result = ambient;
     
     // Tonemapping
-    result /= (result + 1.0);
+    //result = 1.0 - exp(-result * 1.0);
+    // Gamma correction
     result = pow(result, 1.0 / 2.2);
     
     return float4(result, 1.0f);

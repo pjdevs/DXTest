@@ -21,4 +21,5 @@ struct MeshData
 
 	// Builder methods
 	static const MeshData buildCubic(const float width, const float height, const float depth, MeshAttributes attributes);
+	static const MeshData buildNDCRect();
 };

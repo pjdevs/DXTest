@@ -7,7 +7,21 @@ MeshData::MeshData()
 
 float* MeshData::flattenVertices() const
 {
-	size_t size = positions.size() + normals.size() + texCoords.size();
+	size_t size = positions.size();
+	int attributeCount = 3; // position
+	
+	if (texCoords.size() > 0)
+	{
+		size += texCoords.size();
+		attributeCount += 2;
+	}
+
+	if (normals.size() > 0)
+	{
+		size += normals.size();
+		attributeCount += 3;
+	}
+
 	size_t vertexCount = positions.size() / 3;
 	float* vertices = new float[size];
 
@@ -15,18 +29,24 @@ float* MeshData::flattenVertices() const
 	{
 		int firstFloatIndex = 3 * vertexIndex;
 		int firstFloatIndexTex = 2 * vertexIndex;
-		int flatFirstFloatIndex = 8 * vertexIndex;
+		int flatFirstFloatIndex = attributeCount * vertexIndex;
 
 		vertices[flatFirstFloatIndex] = positions[firstFloatIndex];
 		vertices[flatFirstFloatIndex + 1] = positions[firstFloatIndex + 1];
 		vertices[flatFirstFloatIndex + 2] = positions[firstFloatIndex + 2];
 
-		vertices[flatFirstFloatIndex + 3] = texCoords[firstFloatIndexTex];
-		vertices[flatFirstFloatIndex + 4] = texCoords[firstFloatIndexTex + 1];
+		if (texCoords.size() > 0)
+		{
+			vertices[flatFirstFloatIndex + 3] = texCoords[firstFloatIndexTex];
+			vertices[flatFirstFloatIndex + 4] = texCoords[firstFloatIndexTex + 1];
+		}
 
-		vertices[flatFirstFloatIndex + 5] = normals[firstFloatIndex];
-		vertices[flatFirstFloatIndex + 6] = normals[firstFloatIndex + 1];
-		vertices[flatFirstFloatIndex + 7] = normals[firstFloatIndex + 2];
+		if (normals.size() > 0)
+		{
+			vertices[flatFirstFloatIndex + 5] = normals[firstFloatIndex];
+			vertices[flatFirstFloatIndex + 6] = normals[firstFloatIndex + 1];
+			vertices[flatFirstFloatIndex + 7] = normals[firstFloatIndex + 2];
+		}
 	}
 
 	return vertices;
@@ -244,6 +264,50 @@ const MeshData MeshData::buildCubic(const float width, const float height, const
 	data.indices.push_back(22);
 	data.indices.push_back(23);
 	data.indices.push_back(21);
+
+	return data;
+}
+
+const MeshData MeshData::buildNDCRect()
+{
+	MeshData data;
+	data.attributes = (MeshAttributes)(POSITION | TEXCOORD);
+
+	// Front face
+	data.positions.push_back(-1.0f);
+	data.positions.push_back(-1.0f);
+	data.positions.push_back(0.0f);
+
+	data.texCoords.push_back(0.0f);
+	data.texCoords.push_back(0.0f);
+
+	data.positions.push_back(-1.0f);
+	data.positions.push_back(1.0f);
+	data.positions.push_back(0.0f);
+
+	data.texCoords.push_back(0.0f);
+	data.texCoords.push_back(1.0f);
+
+	data.positions.push_back(1.0f);
+	data.positions.push_back(1.0f);
+	data.positions.push_back(0.0f);
+
+	data.texCoords.push_back(1.0f);
+	data.texCoords.push_back(1.0f);
+
+	data.positions.push_back(1.0f);
+	data.positions.push_back(-1.0f);
+	data.positions.push_back(0.0f);
+
+	data.texCoords.push_back(1.0f);
+	data.texCoords.push_back(0.0f);
+
+	data.indices.push_back(0);
+	data.indices.push_back(1);
+	data.indices.push_back(2);
+	data.indices.push_back(0);
+	data.indices.push_back(2);
+	data.indices.push_back(3);
 
 	return data;
 }

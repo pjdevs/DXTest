@@ -10,6 +10,7 @@
 #include "Texture.hpp"
 #include "MeshData.hpp"
 #include "loader.hpp"
+#include "ConstantBuffer.hpp"
 
 using namespace DirectX;
 
@@ -70,6 +71,11 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 }
 	};
 
+	D3D11_INPUT_ELEMENT_DESC positionUVDesc[] = {
+		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 1, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 }
+	};
+
 	D3D11_INPUT_ELEMENT_DESC colorDesc[] = {
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 		{ "COLOR", 0, DXGI_FORMAT_R32G32B32_FLOAT, 1, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 }
@@ -92,7 +98,7 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 	material.ao = 1.0f;
 	material.emissive = XMFLOAT3(1.0f, 1.0f, 1.0f);
 	ID3D11Buffer* materialCb = device.createBuffer(&material, sizeof(MaterialConstantBuffer), D3D11_USAGE_DYNAMIC, D3D11_BIND_CONSTANT_BUFFER, D3D11_CPU_ACCESS_WRITE);
-
+	
 	Asset assets[] =
 	{
 		{ "Plane", "Resources/plane.obj", false },
@@ -132,6 +138,7 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 	float mouseScrollY = 0.0f;
 	bool drawTriedre = false;
 	bool showIrradiance = false;
+	bool showPreFilter = false;
 	CD3D11_VIEWPORT viewport;
 	D3D11_MAPPED_SUBRESOURCE cbRessource;
 	ImGuiIO& io = ImGui::GetIO();
@@ -139,7 +146,7 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 
 	#pragma region Project cubemap
 	Mesh* cubeMesh = loadMesh(device, "Resources/cube.obj", true);
-	Texture* texture = loadTextureHDR(device, "Resources/shanghai_bund_4k.hdr");
+	Texture* texture = loadTextureHDR(device, "Resources/footprint_court.hdr");
 	Texture cubemap(
 		device,
 		512, 512, 4 * sizeof(float),
@@ -217,6 +224,77 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 	}
 	#pragma endregion
 
+	#pragma region PreFilter
+	Texture preFilter(
+		device,
+		128, 128, 4 * sizeof(float),
+		5, 6, DXGI_FORMAT_R32G32B32A32_FLOAT,
+		D3D11_USAGE_DEFAULT, D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE,
+		D3D11_RESOURCE_MISC_TEXTURECUBE | D3D11_RESOURCE_MISC_GENERATE_MIPS, D3D11_SRV_DIMENSION_TEXTURECUBE,
+		nullptr
+	);
+	Shader preFilterShader(device, L"preFilter.hlsl", positionDesc, ARRAYSIZE(positionDesc));
+
+	preFilterShader.bind(device);
+	device.getDeviceContext()->VSSetConstantBuffers(0, 1, &vsCb);
+	cubeMesh->bind(device);
+
+	for (int mip = 0; mip < 5; ++mip)
+	{
+		viewport = CD3D11_VIEWPORT(0.0f, 0.0f, 128.0f / pow(2, mip), 128.0f / pow(2, mip));
+		device.getDeviceContext()->RSSetViewports(1, &viewport);
+		cb.padding = (float)mip / 4.0f; // roughness
+
+		for (int i = 0; i < 6; ++i)
+		{
+			ID3D11RenderTargetView* views = preFilter.getRenderTargetView(device, i, mip);
+
+			device.getDeviceContext()->ClearRenderTargetView(views, clearColor);
+			device.getDeviceContext()->OMSetRenderTargets(1, &views, nullptr);
+			cubemap.bind(device, 0);
+
+			cubeCamera.face(i);
+
+			cb.view = cubeCamera.getView();
+			device.getDeviceContext()->Map(vsCb, 0, D3D11_MAP_WRITE_DISCARD, 0, &cbRessource);
+			memcpy(cbRessource.pData, &cb, sizeof(VSConstantBuffer));
+			device.getDeviceContext()->Unmap(vsCb, 0);
+
+			cubeMesh->draw(device);
+			views->Release();
+		}
+	}
+	#pragma endregion
+
+	#pragma region BRDF LUT
+	MeshData quadData(MeshData::buildNDCRect());
+	float* vertices = quadData.flattenVertices();
+	Mesh ndcQuad(device, vertices, 5 * sizeof(float), quadData.positions.size() / 3, quadData.indices.data(), quadData.indices.size());
+	delete[] vertices;
+	Texture brdfLUT(
+		device,
+		512, 512, 2 * sizeof(float),
+		1, 1, DXGI_FORMAT_R32G32_FLOAT,
+		D3D11_USAGE_DEFAULT, D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE,
+		0, D3D11_SRV_DIMENSION_TEXTURE2D,
+		nullptr
+	);
+	Shader brdfShader(device, L"brdf.hlsl", positionUVDesc, ARRAYSIZE(positionUVDesc));
+
+	viewport = CD3D11_VIEWPORT(0.0f, 0.0f, 512.f, 512.f);
+	device.getDeviceContext()->RSSetViewports(1, &viewport);
+	brdfShader.bind(device);
+	ndcQuad.bind(device);
+
+	ID3D11RenderTargetView* views = brdfLUT.getRenderTargetView(device);
+
+	device.getDeviceContext()->ClearRenderTargetView(views, clearColor);
+	device.getDeviceContext()->OMSetRenderTargets(1, &views, nullptr);
+
+	ndcQuad.draw(device);
+	views->Release();
+	#pragma endregion
+
 	Shader colorShader(device, L"color.hlsl", colorDesc, ARRAYSIZE(colorDesc));
 	float triedreVertices[] =
 	{
@@ -286,8 +364,11 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 		device.getDeviceContext()->VSSetConstantBuffers(0, 1, &vsCb);
 		device.getDeviceContext()->PSSetConstantBuffers(0, 1, &vsCb);
 		device.getDeviceContext()->PSSetConstantBuffers(1, 1, &materialCb);
+
 		cubemap.bind(device, 0);
 		irradiance.bind(device, 1);
+		preFilter.bind(device, 2);
+		brdfLUT.bind(device, 3);
 		albedo->bind(device, 4);
 		metalRoughness->bind(device, 5);
 		ao->bind(device, 7);
@@ -310,7 +391,9 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 		cubemapShader.bind(device);
 		device.getDeviceContext()->VSSetConstantBuffers(0, 1, &vsCb);
 
-		if (showIrradiance)
+		if (showPreFilter)
+			preFilter.bind(device, 0);
+		else if (showIrradiance)
 			irradiance.bind(device, 0);
 		else
 			cubemap.bind(device, 0);
@@ -355,6 +438,7 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 
 			ImGui::Checkbox("Show Axes", &drawTriedre);
 			ImGui::Checkbox("Show Irradiance", &showIrradiance);
+			ImGui::Checkbox("Show Pre Filter", &showPreFilter);
 		}
 
 		ImGui::End();

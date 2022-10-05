@@ -1,7 +1,38 @@
-TextureCube env : register(t0);
-SamplerState textureSampler : register(s0);
-
 static const float PI = 3.14159265359;
+
+
+struct VS_IN
+{
+    float3 position : POSITION;
+    float2 uv : TEXCOORD;
+};
+
+struct VS_OUT
+{
+    float4 position : SV_POSITION;
+    float2 uv : TEXCOORD;
+};
+
+float GeometrySchlickGGX(float NdotV, float roughness)
+{
+    float a = roughness;
+    float k = (a * a) / 2.0;
+
+    float num = NdotV;
+    float denom = NdotV * (1.0 - k) + k;
+	
+    return num / denom;
+}
+
+float GeometrySmith(float3 N, float3 V, float3 L, float roughness)
+{
+    float NdotV = max(dot(N, V), 0.0);
+    float NdotL = max(dot(N, L), 0.0);
+    float ggx2 = GeometrySchlickGGX(NdotV, roughness);
+    float ggx1 = GeometrySchlickGGX(NdotL, roughness);
+	
+    return ggx1 * ggx2;
+}
 
 float RadicalInverse_VdC(uint bits)
 {
@@ -41,61 +72,56 @@ float3 ImportanceSampleGGX(float2 Xi, float3 N, float roughness)
     return normalize(sampleVec);
 }
 
-cbuffer VSConstantBuffer : register(b0)
-{
-    matrix model;
-    matrix view;
-    matrix projection;
-    float roughness;
-};
-
-struct VS_IN
-{
-    float3 position : POSITION;
-};
-
-struct VS_OUT
-{
-    float3 direction : POSITION;
-    float4 position : SV_POSITION;
-};
-
 VS_OUT VSMain(VS_IN input)
 {
     VS_OUT output;
     
-    output.direction = input.position;
-    output.position = mul(mul(float4(input.position, 1.0), view), projection);
+    output.position = float4(input.position, 1.0);
+    output.uv = input.uv;
 
     return output;
 }
 
-float4 PSMain(VS_OUT input) : SV_TARGET
+float2 IntegrateBRDF(float NdotV, float roughness)
 {
-    float3 N = normalize(input.direction);
-    float3 R = N;
-    float3 V = R;
+    float3 V;
+    V.x = sqrt(1.0 - NdotV * NdotV);
+    V.y = 0.0;
+    V.z = NdotV;
+
+    float A = 0.0;
+    float B = 0.0;
+
+    float3 N = float3(0.0, 0.0, 1.0);
 
     const uint SAMPLE_COUNT = 1024u;
-    float totalWeight = 0.0;
-    float3 prefilteredColor = float3(0.0, 0.0, 0.0);
-
     for (uint i = 0u; i < SAMPLE_COUNT; ++i)
     {
         float2 Xi = Hammersley(i, SAMPLE_COUNT);
         float3 H = ImportanceSampleGGX(Xi, N, roughness);
         float3 L = normalize(2.0 * dot(V, H) * H - V);
 
-        float NdotL = max(dot(N, L), 0.0);
+        float NdotL = max(L.z, 0.0);
+        float NdotH = max(H.z, 0.0);
+        float VdotH = max(dot(V, H), 0.0);
+
         if (NdotL > 0.0)
         {
-            L.y *= -1.0;
-            prefilteredColor += env.Sample(textureSampler, L).rgb * NdotL;
-            totalWeight += NdotL;
+            float G = GeometrySmith(N, V, L, roughness);
+            float G_Vis = (G * VdotH) / (NdotH * NdotV);
+            float Fc = pow(1.0 - VdotH, 5.0);
+
+            A += (1.0 - Fc) * G_Vis;
+            B += Fc * G_Vis;
         }
     }
-    prefilteredColor = prefilteredColor / totalWeight;
+    A /= float(SAMPLE_COUNT);
+    B /= float(SAMPLE_COUNT);
 
-    return float4(prefilteredColor, 1.0);
+    return float2(A, B);
+}
 
+float2 PSMain(VS_OUT input) : SV_TARGET
+{
+    return IntegrateBRDF(input.uv.x, 1.0 - input.uv.y);
 }

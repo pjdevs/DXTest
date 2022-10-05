@@ -190,9 +190,16 @@
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
     </FxCompile>
+    <FxCompile Include="brdf.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Vertex</ShaderType>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Camera.hpp" />
+    <ClInclude Include="ConstantBuffer.hpp" />
     <ClInclude Include="GraphicsDevice.hpp" />
     <ClInclude Include="loader.hpp" />
     <ClInclude Include="Mesh.hpp" />
@@ -201,9 +208,6 @@
     <ClInclude Include="Shader.hpp" />
     <ClInclude Include="stb_image.h" />
     <ClInclude Include="Texture.hpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Resources\park_parking_4k.hdr" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -128,6 +128,9 @@ Texture::Texture(const GraphicsDevice& device, int width, int height, UINT pixel
 	if (FAILED(hr))
 		throw std::exception("Cannot create resource view");
 
+	if (mipLevels == 0 || mipLevels > 1)
+		device.getDeviceContext()->GenerateMips(_textureView);
+
 	D3D11_SAMPLER_DESC samplerDesc;
 	ZeroMemory(&samplerDesc, sizeof(samplerDesc));
 	samplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;

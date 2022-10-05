@@ -74,9 +74,9 @@
     <ClInclude Include="loader.hpp">
       <Filter>Fichiers d%27en-tête</Filter>
     </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Resources\park_parking_4k.hdr" />
+    <ClInclude Include="ConstantBuffer.hpp">
+      <Filter>Fichiers d%27en-tête</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="phong.hlsl">
@@ -98,6 +98,9 @@
       <Filter>Shaders</Filter>
     </FxCompile>
     <FxCompile Include="preFilter.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="brdf.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
   </ItemGroup>
