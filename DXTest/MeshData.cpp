@@ -279,28 +279,28 @@ const MeshData MeshData::buildNDCRect()
 	data.positions.push_back(0.0f);
 
 	data.texCoords.push_back(0.0f);
-	data.texCoords.push_back(0.0f);
+	data.texCoords.push_back(1.0f);
 
 	data.positions.push_back(-1.0f);
 	data.positions.push_back(1.0f);
 	data.positions.push_back(0.0f);
 
 	data.texCoords.push_back(0.0f);
-	data.texCoords.push_back(1.0f);
+	data.texCoords.push_back(0.0f);
 
 	data.positions.push_back(1.0f);
 	data.positions.push_back(1.0f);
 	data.positions.push_back(0.0f);
 
 	data.texCoords.push_back(1.0f);
-	data.texCoords.push_back(1.0f);
+	data.texCoords.push_back(0.0f);
 
 	data.positions.push_back(1.0f);
 	data.positions.push_back(-1.0f);
 	data.positions.push_back(0.0f);
 
 	data.texCoords.push_back(1.0f);
-	data.texCoords.push_back(0.0f);
+	data.texCoords.push_back(1.0f);
 
 	data.indices.push_back(0);
 	data.indices.push_back(1);

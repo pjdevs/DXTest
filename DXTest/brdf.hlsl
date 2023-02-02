@@ -123,5 +123,5 @@ float2 IntegrateBRDF(float NdotV, float roughness)
 
 float2 PSMain(VS_OUT input) : SV_TARGET
 {
-    return IntegrateBRDF(input.uv.x, 1.0 - input.uv.y);
+    return IntegrateBRDF(input.uv.x, input.uv.y);
 }

@@ -9,12 +9,14 @@ LRESULT CALLBACK RenderWindow::WinProc(HWND handle, UINT msg, WPARAM wParam, LPA
 
 	if (msg == WM_SIZE && wParam != SIZE_MINIMIZED && window && window->getSwapChain())
 	{
+		window->_backBufferDesc.Width = (UINT)LOWORD(lParam);
+		window->_backBufferDesc.Height = (UINT)HIWORD(lParam);
 		window->_backBufferRTView->Release();
 		window->_backBufferDSView->Release();
 		window->_backBufferDSView = nullptr;
 		window->_backBufferRTView = nullptr;
 		window->getSwapChain()->ResizeBuffers(0, (UINT)LOWORD(lParam), (UINT)HIWORD(lParam), DXGI_FORMAT_UNKNOWN, 0);
-		window->createBackBuffer(window->_device.getDevice(), window->getSwapChain());
+		window->createBackBuffer();
 
 		return 0;
 	}
@@ -46,11 +48,11 @@ void RenderWindow::createWindow(int width, int height)
 	SetWindowLongPtr(_handle, GWLP_USERDATA, (LONG_PTR)this);
 }
 
-void RenderWindow::createSwapChain(HWND handle, ID3D11Device* device)
+void RenderWindow::createSwapChain()
 {
 	// Get the factory from device
 	IDXGIDevice* pDXGIDevice = nullptr;
-	HRESULT hr = device->QueryInterface(__uuidof(IDXGIDevice), (void**)&pDXGIDevice);
+	HRESULT hr = _gfx.getDevice()->QueryInterface(__uuidof(IDXGIDevice), (void**)&pDXGIDevice);
 
 	if (FAILED(hr))
 		throw new std::exception("Cannot get the DXGIDevice");
@@ -72,13 +74,13 @@ void RenderWindow::createSwapChain(HWND handle, ID3D11Device* device)
 	swapChainDesc.BufferCount = 2;
 	swapChainDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 	swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-	swapChainDesc.OutputWindow = handle;
+	swapChainDesc.OutputWindow = _handle;
 	swapChainDesc.SampleDesc.Count = 1;
 	swapChainDesc.Windowed = true;
 	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
 
 	hr = pIDXGIFactory->CreateSwapChain(
-		device,
+		_gfx.getDevice().Get(),
 		&swapChainDesc,
 		&_swapChain
 	);
@@ -87,17 +89,17 @@ void RenderWindow::createSwapChain(HWND handle, ID3D11Device* device)
 		throw new std::exception("Cannot create the DXGISwapChain");
 }
 
-void RenderWindow::createBackBuffer(ID3D11Device* device, IDXGISwapChain* swapChain)
+void RenderWindow::createBackBuffer()
 {
 	// Create render target
-	ID3D11Texture2D* backBufferTexture = nullptr;
+	Microsoft::WRL::ComPtr<ID3D11Texture2D> backBufferTexture = nullptr;
 
-	HRESULT hr = swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (void**)&backBufferTexture);
+	HRESULT hr = _swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (void**)backBufferTexture.GetAddressOf());
 
 	if (FAILED(hr))
 		throw new std::exception("Cannot get the backbuffer");
 
-	hr = device->CreateRenderTargetView(backBufferTexture, nullptr, &_backBufferRTView);
+	hr = _gfx.getDevice()->CreateRenderTargetView(backBufferTexture.Get(), nullptr, _backBufferRTView.GetAddressOf());
 
 	if (FAILED(hr))
 		throw new std::exception("Error while creating render target view");
@@ -106,7 +108,7 @@ void RenderWindow::createBackBuffer(ID3D11Device* device, IDXGISwapChain* swapCh
 	backBufferTexture->GetDesc(&_backBufferDesc);
 
 	// Create depth stencil
-	ID3D11Texture2D* depthStencilTexture = nullptr;
+	Microsoft::WRL::ComPtr<ID3D11Texture2D> depthStencilTexture = nullptr;
 	D3D11_TEXTURE2D_DESC depthStencilDesc = { 0 };
 	depthStencilDesc.Width = _backBufferDesc.Width;
 	depthStencilDesc.Height = _backBufferDesc.Height;
@@ -120,24 +122,20 @@ void RenderWindow::createBackBuffer(ID3D11Device* device, IDXGISwapChain* swapCh
 	depthStencilDesc.CPUAccessFlags = 0;
 	depthStencilDesc.MiscFlags = 0;
 
-	hr = device->CreateTexture2D(&depthStencilDesc, nullptr, &depthStencilTexture);
+	hr = _gfx.getDevice()->CreateTexture2D(&depthStencilDesc, nullptr, &depthStencilTexture);
 
 	// Check for error
 	if (FAILED(hr))
 		throw new std::exception("Error while creating depth stencil");
 
-	hr = device->CreateDepthStencilView(depthStencilTexture, nullptr, &_backBufferDSView);
+	hr = _gfx.getDevice()->CreateDepthStencilView(depthStencilTexture.Get(), nullptr, _backBufferDSView.GetAddressOf());
 
 	// Check for error
 	if (FAILED(hr))
 		throw new std::exception("Error while creating depth stencil view");
-
-	// Release textures
-	backBufferTexture->Release();
-	depthStencilTexture->Release();
 }
 
-void RenderWindow::initImGui(HWND handle, ID3D11Device* device, ID3D11DeviceContext* deviceContext)
+void RenderWindow::initImGui()
 {
 	// Setup Dear ImGui context
 	IMGUI_CHECKVERSION();
@@ -151,17 +149,17 @@ void RenderWindow::initImGui(HWND handle, ID3D11Device* device, ID3D11DeviceCont
 	//ImGui::StyleColorsLight();
 
 	// Setup Platform/Renderer backends
-	ImGui_ImplWin32_Init(handle);
-	ImGui_ImplDX11_Init(device, deviceContext);
+	ImGui_ImplWin32_Init(_handle);
+	ImGui_ImplDX11_Init(_gfx.getDevice().Get(), _gfx.getDeviceContext().Get());
 }
 
-RenderWindow::RenderWindow(const GraphicsDevice& device, int width, int height)
-	: _handle(0), _swapChain(nullptr), _backBufferRTView(nullptr), _backBufferDSView(nullptr), _device(device)
+RenderWindow::RenderWindow(const Graphics& gfx, int width, int height)
+	: _gfx(gfx), _handle(0), _swapChain(nullptr), _backBufferRTView(nullptr), _backBufferDSView(nullptr)
 {
 	createWindow(width, height);
-	createSwapChain(_handle, device.getDevice());
-	createBackBuffer(device.getDevice(), _swapChain);
-	initImGui(_handle, device.getDevice(), device.getDeviceContext());
+	createSwapChain();
+	createBackBuffer();
+	initImGui();
 }
 
 RenderWindow::~RenderWindow()
@@ -169,10 +167,6 @@ RenderWindow::~RenderWindow()
 	ImGui_ImplDX11_Shutdown();
 	ImGui_ImplWin32_Shutdown();
 	ImGui::DestroyContext();
-
-	_backBufferRTView->Release();
-	_backBufferDSView->Release();
-	_swapChain->Release();
 }
 
 int RenderWindow::getWidth() const
@@ -205,15 +199,15 @@ void RenderWindow::present() const
 
 IDXGISwapChain* RenderWindow::getSwapChain() const
 {
-	return _swapChain;
+	return _swapChain.Get();
 }
 
 ID3D11RenderTargetView* RenderWindow::getBackBufferRT() const
 {
-	return _backBufferRTView;
+	return _backBufferRTView.Get();
 }
 
 ID3D11DepthStencilView* RenderWindow::getBackBufferDS() const
 {
-	return _backBufferDSView;
+	return _backBufferDSView.Get();
 }

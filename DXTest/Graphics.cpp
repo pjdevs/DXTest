@@ -1,8 +1,9 @@
-#include "GraphicsDevice.hpp"
+#include "Graphics.hpp"
 
-GraphicsDevice::GraphicsDevice()
+Graphics::Graphics()
 	: _device(nullptr), _deviceContext(nullptr)
 {
+	// Select an adapter
 	IDXGIAdapter* pAdapter;
 	std::vector<IDXGIAdapter*> vAdapters;
 	IDXGIFactory* pFactory = nullptr;
@@ -24,6 +25,7 @@ GraphicsDevice::GraphicsDevice()
 
 	pFactory->Release();
 
+	// Create device
 	D3D_FEATURE_LEVEL featureLevels[] = { D3D_FEATURE_LEVEL_11_0 };
 	D3D_FEATURE_LEVEL level;
 
@@ -44,17 +46,21 @@ GraphicsDevice::GraphicsDevice()
 		throw std::exception("Direct3D 11.0 must be supported");
 }
 
-ID3D11Device* GraphicsDevice::getDevice() const
+Graphics::~Graphics()
+{
+}
+
+Microsoft::WRL::ComPtr<ID3D11Device> Graphics::getDevice() const
 {
 	return _device;
 }
 
-ID3D11DeviceContext* GraphicsDevice::getDeviceContext() const
+Microsoft::WRL::ComPtr<ID3D11DeviceContext> Graphics::getDeviceContext() const
 {
 	return _deviceContext;
 }
 
-ID3D11Buffer* GraphicsDevice::createBuffer(void* data, size_t sizeInBytes, D3D11_USAGE usage, D3D11_BIND_FLAG bindFlags, D3D11_CPU_ACCESS_FLAG cpuAccessFlags) const
+ID3D11Buffer* Graphics::createBuffer(void* data, size_t sizeInBytes, D3D11_USAGE usage, D3D11_BIND_FLAG bindFlags, D3D11_CPU_ACCESS_FLAG cpuAccessFlags) const
 {
 	D3D11_BUFFER_DESC cbDesc = { 0 };
 	cbDesc.ByteWidth = sizeInBytes;

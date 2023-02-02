@@ -50,7 +50,7 @@ MeshData* loadMeshData(const std::string& path, bool flip)
 	return data;
 }
 
-Texture* loadTexture(const GraphicsDevice& device, const std::string& path, bool alpha)
+Texture* loadTexture(const Graphics& device, const std::string& path, bool alpha)
 {
 	int width, height, channels;
 	stbi_set_flip_vertically_on_load(true);
@@ -98,7 +98,7 @@ Texture* loadTexture(const GraphicsDevice& device, const std::string& path, bool
 
 }
 
-Texture* loadTextureHDR(const GraphicsDevice& device, const std::string& path)
+Texture* loadTextureHDR(const Graphics& device, const std::string& path)
 {
 	int width, height, channels;
 	stbi_set_flip_vertically_on_load(false);

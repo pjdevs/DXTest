@@ -1,6 +1,6 @@
 #include "Shader.hpp"
 
-Shader::Shader(const GraphicsDevice& device, const std::wstring& shaderPath, D3D11_INPUT_ELEMENT_DESC* layoutDesc, int layoutSize)
+Shader::Shader(const Graphics& device, const std::wstring& shaderPath, D3D11_INPUT_ELEMENT_DESC* layoutDesc, int layoutSize)
 	: _path(shaderPath), _layoutDesc(layoutDesc), _layoutSize(layoutSize)
 {
 	loadShader(device);
@@ -11,7 +11,7 @@ Shader::~Shader()
 	unloadShader();
 }
 
-void Shader::loadShader(const GraphicsDevice& device)
+void Shader::loadShader(const Graphics& device)
 {
 	// Creating shaders
 	HRESULT hr;
@@ -68,7 +68,7 @@ void Shader::unloadShader()
 	_vertexShader->Release();
 }
 
-void Shader::reload(const GraphicsDevice& device)
+void Shader::reload(const Graphics& device)
 {
 	unloadShader();
 	loadShader(device);
@@ -89,7 +89,7 @@ ID3D11InputLayout* Shader::getInputLayout() const
 	return _inputLayout;
 }
 
-void Shader::bind(const GraphicsDevice& device)
+void Shader::bind(const Graphics& device)
 {
 	device.getDeviceContext()->IASetInputLayout(getInputLayout());
 	device.getDeviceContext()->VSSetShader(getVertexShader(), nullptr, 0);

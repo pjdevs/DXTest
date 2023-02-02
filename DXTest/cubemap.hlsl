@@ -37,8 +37,8 @@ VS_OUT VSMain(VS_IN input)
 
 float4 PSMain(VS_OUT input) : SV_TARGET
 {
-    float3 result = tex.Sample(textureSampler, input.direction);
-    result /= (result + 1.0);
+    float3 result = tex.SampleLevel(textureSampler, input.direction, 1.2);
+    //result /= (result + 1.0);
     result = pow(result, 1.0/2.2);
     
     return float4(result, 1.0); 

@@ -9,5 +9,5 @@
 #include "stb_image.h"
 
 MeshData* loadMeshData(const std::string& path, bool flip = false);
-Texture* loadTexture(const GraphicsDevice& device, const std::string& path, bool alpha = false);
-Texture* loadTextureHDR(const GraphicsDevice& device, const std::string& path);
+Texture* loadTexture(const Graphics& device, const std::string& path, bool alpha = false);
+Texture* loadTextureHDR(const Graphics& device, const std::string& path);

@@ -46,6 +46,7 @@ cbuffer VSConstantBuffer : register(b0)
     matrix model;
     matrix view;
     matrix projection;
+    float3 viewPos;
     float roughness;
 };
 
@@ -97,5 +98,4 @@ float4 PSMain(VS_OUT input) : SV_TARGET
     prefilteredColor = prefilteredColor / totalWeight;
 
     return float4(prefilteredColor, 1.0);
-
 }

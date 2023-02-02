@@ -3,7 +3,7 @@
 #include <exception>
 #include <d3d11.h>
 #include <DirectXMath.h>
-#include "GraphicsDevice.hpp"
+#include "Graphics.hpp"
 
 constexpr auto MESH_ATTRIBUTES = 4;
 
@@ -29,7 +29,7 @@ private:
 	D3D11_PRIMITIVE_TOPOLOGY _topology;
 
 public:
-	Mesh(const GraphicsDevice& device, void* vertices, UINT vertexSize, UINT vertexCount, UINT* indices, UINT indexCount, D3D11_PRIMITIVE_TOPOLOGY topology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	Mesh(const Graphics& device, void* vertices, UINT vertexSize, UINT vertexCount, UINT* indices, UINT indexCount, D3D11_PRIMITIVE_TOPOLOGY topology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	~Mesh();
 
 	ID3D11Buffer** getVertexBuffers();
@@ -39,6 +39,6 @@ public:
 	UINT getNumBuffers() const;
 	UINT getIndexCount() const;
 
-	void bind(const GraphicsDevice& device);
-	void draw(const GraphicsDevice& device);
+	void bind(const Graphics& device);
+	void draw(const Graphics& device);
 };

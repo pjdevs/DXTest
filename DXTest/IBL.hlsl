@@ -26,6 +26,7 @@ cbuffer MaterialConstantBuffer : register(b1)
     float materialRoughness;
     float3 materialEmissive;
     float materialAO;
+    bool materialMaps;
 };
 
 struct VS_IN
@@ -39,7 +40,7 @@ struct VS_OUT
 {
     float3 worldPos : POSITIONT;
     float2 uv : TEXCOORD;
-    float3 normal : POSITION;
+    float3 normal : NORMAL;
     float4 position : SV_POSITION;
 };
 
@@ -55,6 +56,47 @@ VS_OUT VSMain(VS_IN input)
     output.position = mul(mul(worldPos, view), projection);
 
     return output;
+}
+
+static const float PI = 3.14159265359;
+
+float DistributionGGX(float3 N, float3 H, float roughness)
+{
+    float a = roughness * roughness;
+    float a2 = a * a;
+    float NdotH = max(dot(N, H), 0.0);
+    float NdotH2 = NdotH * NdotH;
+	
+    float num = a2;
+    float denom = (NdotH2 * (a2 - 1.0) + 1.0);
+    denom = PI * denom * denom;
+	
+    return num / denom;
+}
+
+float GeometrySchlickGGX(float NdotV, float roughness)
+{
+    float r = (roughness + 1.0);
+    float k = (r * r) / 8.0;
+
+    float num = NdotV;
+    float denom = NdotV * (1.0 - k) + k;
+	
+    return num / denom;
+}
+float GeometrySmith(float3 N, float3 V, float3 L, float roughness)
+{
+    float NdotV = max(dot(N, V), 0.0);
+    float NdotL = max(dot(N, L), 0.0);
+    float ggx2 = GeometrySchlickGGX(NdotV, roughness);
+    float ggx1 = GeometrySchlickGGX(NdotL, roughness);
+	
+    return ggx1 * ggx2;
+}
+
+float3 FresnelSchlick(float cosTheta, float3 F0)
+{
+    return F0 + (1.0 - F0) * pow(saturate(1.0 - cosTheta), 5.0);
 }
 
 float3 FresnelSchlickRoughness(float cosTheta, float3 F0, float roughness)
@@ -74,21 +116,24 @@ float4 PSMain(VS_OUT input) : SV_TARGET
     float3 emissive = materialEmissive;
     
     // Sample maps
-    float3 metallicRoughness = metallicRoughnessMap.Sample(defaultSampler, input.uv);;
-    albedo = albedoMap.Sample(defaultSampler, input.uv);
-    metallic = metallicRoughness.b;
-    roughness = metallicRoughness.g;
-    //normal *= normalMap.Sample(defaultSampler, input.uv);
-    ao = aoMap.Sample(defaultSampler, input.uv);
-    emissive = emissiveMap.Sample(defaultSampler, input.uv);
-
+    if (materialMaps)
+    {
+        float3 metallicRoughness = metallicRoughnessMap.Sample(defaultSampler, input.uv);
+        albedo = albedoMap.Sample(defaultSampler, input.uv);
+        metallic = metallicRoughness.b;
+        roughness = metallicRoughness.g;
+        //normal *= normalMap.Sample(defaultSampler, input.uv);
+        ao = aoMap.Sample(defaultSampler, input.uv);
+        emissive = emissiveMap.Sample(defaultSampler, input.uv);
+    }
+    
     // Setup usefull vectors
     float3 viewDir = normalize(viewPos - input.worldPos);
 
     // IBL
-    float3 F0 = float3(0.04, 0.04, 0.04);
+    float3 F0 = 0.04;
     F0 = lerp(F0, albedo, metallic);
-    float3 F = FresnelSchlickRoughness(saturate(dot(normal, viewDir)), F0, roughness);
+    float3 F = FresnelSchlick(saturate(dot(normal, viewDir)), F0);
     float3 kS = F;
     float3 kD = (1.0 - kS) * (1.0 - metallic);
     
@@ -102,13 +147,44 @@ float4 PSMain(VS_OUT input) : SV_TARGET
     float3 prefilteredColor = preFilterMap.SampleLevel(defaultSampler, R, roughness * MAX_REFLECTION_LOD).rgb;
     float2 envBRDF = brdfLUT.Sample(defaultSampler, float2(saturate(dot(normal, viewDir)), roughness)).rg;
     float3 specular = prefilteredColor * (F * envBRDF.x + envBRDF.y);
-  
-    // Final color
+    
     float3 ambient = (kD * diffuse + specular) * ao + emissive;
-    float3 result = ambient;
+    
+    // Direct lighting
+    const float3 lightPosition = float3(1.0, 1.0, 3.0);
+    const float3 lightColor = 20.0;
+    float3 Lo = 0.0;
+    
+    float3 L = normalize(lightPosition - input.worldPos);
+    float3 H = normalize(viewDir + L);
+    float distance = length(lightPosition - input.worldPos);
+    float attenuation = 1.0; // (distance * distance);
+    float3 radiance = lightColor * attenuation;
+        
+    // Cook-Torrance BRDF
+    float NDF = DistributionGGX(normal, H, roughness);
+    float G = GeometrySmith(normal, viewDir, L, roughness);
+    F = FresnelSchlick(max(dot(H, viewDir), 0.0), F0);
+        
+    kS = F;
+    kD = 1.0 - kS;
+    kD *= 1.0 - metallic;
+        
+    float3 numerator = NDF * G * F;
+    float denominator = 4.0 * max(dot(normal, viewDir), 0.0) * max(dot(normal, L), 0.0) + 0.0001;
+    specular = numerator / denominator;
+            
+    // add to outgoing radiance Lo
+    float NdotL = max(dot(normal, L), 0.0);
+    Lo += (kD * albedo / PI + specular) * radiance * NdotL;
+    
+    // Final color
+    float3 result = Lo + ambient;
+    //float3 result = (normal + 1.0) * 0.5;
     
     // Tonemapping
-    //result = 1.0 - exp(-result * 1.0);
+    result = 1.0 - exp(-result * 1.0);
+
     // Gamma correction
     result = pow(result, 1.0 / 2.2);
     

@@ -2,7 +2,7 @@
 #define NOMINMAX
 
 #include <imgui.h>
-#include "GraphicsDevice.hpp"
+#include "Graphics.hpp"
 #include "RenderWindow.hpp"
 #include "Shader.hpp"
 #include "Mesh.hpp"
@@ -14,20 +14,14 @@
 
 using namespace DirectX;
 
-struct Vertex
-{
-	XMFLOAT3 position;
-	XMFLOAT2 uv;
-	XMFLOAT3 normal;
-};
-
 struct VSConstantBuffer
 {
 	XMFLOAT4X4 model;
 	XMFLOAT4X4 view;
 	XMFLOAT4X4 projection;
 	XMFLOAT3 viewPos;
-	float padding;
+	float roughness;
+	float p1, p2, p3, p4;
 };
 
 struct MaterialConstantBuffer
@@ -37,7 +31,8 @@ struct MaterialConstantBuffer
 	float roughness;
 	XMFLOAT3 emissive;
 	float ao;
-	float p1, p2, p3;
+	bool maps;
+	float p2, p3;
 };
 
 struct Asset
@@ -47,7 +42,7 @@ struct Asset
 	bool isSelected;
 };
 
-Mesh* loadMesh(const GraphicsDevice& device, const std::string& path, bool flip = false)
+Mesh* loadMesh(const Graphics& device, const std::string& path, bool flip = false)
 {
 	MeshData* data = loadMeshData(path, flip);
 	float* vertices = data->flattenVertices();
@@ -82,21 +77,23 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 	};
 
 	// Init device, window, swapchain
-	GraphicsDevice device;
+	Graphics device;
 	RenderWindow window(device, 800, 600);
 	Shader shader(device, L"IBL.hlsl", normalDesc, ARRAYSIZE(normalDesc));
 	Shader cubemapShader(device, L"cubemap.hlsl", positionDesc, ARRAYSIZE(positionDesc));
 	SphericalCamera camera(0.f, 0.f, 0.f);
 
 	VSConstantBuffer cb {};
+	cb.roughness = 0.5f;
 	ID3D11Buffer* vsCb = device.createBuffer(&cb, sizeof(VSConstantBuffer), D3D11_USAGE_DYNAMIC, D3D11_BIND_CONSTANT_BUFFER, D3D11_CPU_ACCESS_WRITE);
 
 	MaterialConstantBuffer material {};
-	material.albedo = XMFLOAT3(1.0f, 1.0f, 1.0f);
-	material.metallic = 1.0f;
-	material.roughness = 1.0f;
+	material.albedo = XMFLOAT3(1.0f, 0.0f, 0.0f);
+	material.metallic = 0.0f;
+	material.roughness = 0.5f;
 	material.ao = 1.0f;
-	material.emissive = XMFLOAT3(1.0f, 1.0f, 1.0f);
+	material.emissive = XMFLOAT3(0.0f, 0.0f, 0.0f);
+	material.maps = true;
 	ID3D11Buffer* materialCb = device.createBuffer(&material, sizeof(MaterialConstantBuffer), D3D11_USAGE_DYNAMIC, D3D11_BIND_CONSTANT_BUFFER, D3D11_CPU_ACCESS_WRITE);
 	
 	Asset assets[] =
@@ -139,6 +136,7 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 	bool drawTriedre = false;
 	bool showIrradiance = false;
 	bool showPreFilter = false;
+	bool drawSpheres = true;
 	CD3D11_VIEWPORT viewport;
 	D3D11_MAPPED_SUBRESOURCE cbRessource;
 	ImGuiIO& io = ImGui::GetIO();
@@ -146,6 +144,7 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 
 	#pragma region Project cubemap
 	Mesh* cubeMesh = loadMesh(device, "Resources/cube.obj", true);
+	Mesh* sphereMesh = loadMesh(device, "Resources/sphere_smooth.obj");
 	Texture* texture = loadTextureHDR(device, "Resources/footprint_court.hdr");
 	Texture cubemap(
 		device,
@@ -237,13 +236,14 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 
 	preFilterShader.bind(device);
 	device.getDeviceContext()->VSSetConstantBuffers(0, 1, &vsCb);
+	device.getDeviceContext()->PSSetConstantBuffers(0, 1, &vsCb);
 	cubeMesh->bind(device);
 
 	for (int mip = 0; mip < 5; ++mip)
 	{
 		viewport = CD3D11_VIEWPORT(0.0f, 0.0f, 128.0f / pow(2, mip), 128.0f / pow(2, mip));
 		device.getDeviceContext()->RSSetViewports(1, &viewport);
-		cb.padding = (float)mip / 4.0f; // roughness
+		cb.roughness = (float)mip / 4.0f; // roughness
 
 		for (int i = 0; i < 6; ++i)
 		{
@@ -351,8 +351,6 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 		viewport = CD3D11_VIEWPORT(0.f, 0.f, window.getWidth(), window.getHeight());
 
 		ID3D11RenderTargetView* renderTargets = window.getBackBufferRT();
-		ID3D11ShaderResourceView* views = texture->getTextureView();
-		ID3D11SamplerState* samplers = texture->getSampler();
 
 		device.getDeviceContext()->OMSetRenderTargets(1, &renderTargets, window.getBackBufferDS());
 		device.getDeviceContext()->RSSetViewports(1, &viewport);
@@ -363,19 +361,52 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 		shader.bind(device);
 		device.getDeviceContext()->VSSetConstantBuffers(0, 1, &vsCb);
 		device.getDeviceContext()->PSSetConstantBuffers(0, 1, &vsCb);
-		device.getDeviceContext()->PSSetConstantBuffers(1, 1, &materialCb);
 
 		cubemap.bind(device, 0);
 		irradiance.bind(device, 1);
 		preFilter.bind(device, 2);
 		brdfLUT.bind(device, 3);
-		albedo->bind(device, 4);
-		metalRoughness->bind(device, 5);
-		ao->bind(device, 7);
-		emissive->bind(device, 8);
 
-		mesh->bind(device);
-		mesh->draw(device);
+		if (!drawSpheres)
+		{
+			material.maps = true;
+			device.getDeviceContext()->Map(materialCb, 0, D3D11_MAP_WRITE_DISCARD, 0, &cbRessource);
+			memcpy(cbRessource.pData, &material, sizeof(MaterialConstantBuffer));
+			device.getDeviceContext()->Unmap(materialCb, 0);
+			device.getDeviceContext()->PSSetConstantBuffers(1, 1, &materialCb);
+
+			albedo->bind(device, 4);
+			metalRoughness->bind(device, 5);
+			ao->bind(device, 7);
+			emissive->bind(device, 8);
+
+			mesh->bind(device);
+			mesh->draw(device);
+		}
+		else
+		{
+			sphereMesh->bind(device);
+
+			for (int i = 0; i < 10; ++i)
+			{
+				for (int j = 0; j < 10; ++j)
+				{
+					XMStoreFloat4x4(&cb.model, XMMatrixTranspose(XMMatrixTranslation(-10.0f + i * 2.0f, -10.0f + j * 2.0f, 0.0f)));
+					device.getDeviceContext()->Map(vsCb, 0, D3D11_MAP_WRITE_DISCARD, 0, &cbRessource);
+					memcpy(cbRessource.pData, &cb, sizeof(VSConstantBuffer));
+					device.getDeviceContext()->Unmap(vsCb, 0);
+
+					material.maps = false;
+					material.metallic = (float)j / 9.0f;
+					material.roughness = (float)i / 9.0f;
+					device.getDeviceContext()->Map(materialCb, 0, D3D11_MAP_WRITE_DISCARD, 0, &cbRessource);
+					memcpy(cbRessource.pData, &material, sizeof(MaterialConstantBuffer));
+					device.getDeviceContext()->Unmap(materialCb, 0);
+
+					sphereMesh->draw(device);
+				}
+			}
+		}
 
 		if (drawTriedre)
 		{
@@ -436,6 +467,7 @@ int CALLBACK WinMain(_In_ HINSTANCE appInstance, _In_opt_ HINSTANCE prevInstance
 				cubemapShader.reload(device);
 			}
 
+			ImGui::Checkbox("Draw Spheres", &drawSpheres);
 			ImGui::Checkbox("Show Axes", &drawTriedre);
 			ImGui::Checkbox("Show Irradiance", &showIrradiance);
 			ImGui::Checkbox("Show Pre Filter", &showPreFilter);

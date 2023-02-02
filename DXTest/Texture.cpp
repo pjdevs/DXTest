@@ -1,6 +1,6 @@
 #include "Texture.hpp"
 
-//Texture::Texture(const GraphicsDevice& device, int width, int height, void* data, UINT pixelSize, DXGI_FORMAT format, bool renderable)
+//Texture::Texture(const Graphics& device, int width, int height, void* data, UINT pixelSize, DXGI_FORMAT format, bool renderable)
 //	: _texture(nullptr), _textureView(nullptr), _sampler(nullptr), _rtView(nullptr)
 //{
 //	D3D11_TEXTURE2D_DESC textureDesc = { 0 };
@@ -89,13 +89,13 @@
 //	return _rtView;
 //}
 //
-//void Texture::bind(const GraphicsDevice& device, int slot)
+//void Texture::bind(const Graphics& device, int slot)
 //{
 //	device.getDeviceContext()->PSSetShaderResources(slot, 1, &_textureView);
 //	device.getDeviceContext()->PSSetSamplers(slot, 1, &_sampler);
 //}
 
-Texture::Texture(const GraphicsDevice& device, int width, int height, UINT pixelSize, int mipLevels, int arraySize, DXGI_FORMAT format, D3D11_USAGE usage, UINT bindFlags, UINT miscFlags, D3D11_SRV_DIMENSION viewDimension, void* data)
+Texture::Texture(const Graphics& device, int width, int height, UINT pixelSize, int mipLevels, int arraySize, DXGI_FORMAT format, D3D11_USAGE usage, UINT bindFlags, UINT miscFlags, D3D11_SRV_DIMENSION viewDimension, void* data)
 	: _desc(), _texture(nullptr), _textureView(nullptr), _sampler(nullptr)
 {
 	_desc.Width = width;
@@ -165,7 +165,7 @@ ID3D11ShaderResourceView* Texture::getTextureView()
 	return _textureView;
 }
 
-ID3D11RenderTargetView* Texture::getRenderTargetView(const GraphicsDevice& device, int face, int mip, int size)
+ID3D11RenderTargetView* Texture::getRenderTargetView(const Graphics& device, int face, int mip, int size)
 {
 	ID3D11RenderTargetView* rtView = nullptr;
 	D3D11_RENDER_TARGET_VIEW_DESC rtDesc = CD3D11_RENDER_TARGET_VIEW_DESC(
@@ -189,7 +189,7 @@ ID3D11SamplerState* Texture::getSampler()
 	return _sampler;
 }
 
-void Texture::bind(const GraphicsDevice& device, int slot)
+void Texture::bind(const Graphics& device, int slot)
 {
 	device.getDeviceContext()->PSSetShaderResources(slot, 1, &_textureView);
 	device.getDeviceContext()->PSSetSamplers(slot, 1, &_sampler);
